@@ -21,7 +21,7 @@ Future extension: an AI agent flyout (Copilot-style) that answers questions and 
 | Tenancy | Single-tenant, multi-workspace (one deployment hosts AP Invoices and any future workspaces). |
 | Auth pattern | **BFF + OBO** for user-scoped operations; **app-only SP** for admin provisioning and item-permission grants at upload. No MSAL.js in the browser — MSAL-Node runs server-side. |
 | SPE container model | One container per workspace, team folders inside. Plus one **system container** (SP-only access, invisible to end users) for runtime config + sessions. |
-| Admin/team source | Entra ID security groups + a **group-to-role map** stored as JSON in the system container. Admin role defined as an Entra app role or group. |
+| Admin/team source | Team membership from Entra ID security groups mapped via a JSON config in the system container. Admin role is the Entra **app role** `AppAdmin` on the app registration (never configurable at runtime). |
 | Sharing recipient model | Internal-only (same tenant); Graph sharing link with `preventsDownload=true, type=view`, expiry required. |
 | File lifecycle | **Write-once for uploaders.** Uploader cannot modify or delete after upload. Admins can modify/delete. |
 | Visibility | **Only-own.** Uploaders see only files they personally uploaded; admins see everything. |
@@ -74,7 +74,9 @@ The image runs a Node.js (TypeScript) BFF process that:
 3. User authenticates at Entra ID (MFA per tenant Conditional Access).
 4. Entra ID redirects auth code to `/api/auth/callback`.
 5. BFF (MSAL-Node confidential client) exchanges the code for ID + access + refresh tokens.
-6. BFF resolves user's role by intersecting token group claims (or `/me/transitiveMemberOf` on groups overage) with the `/config/group-role-map.json` in the SPE system container.
+6. BFF resolves the user's access profile:
+   - **Admin flag** from the `roles` claim on the ID token (`AppAdmin` present ⇒ admin).
+   - **Team membership** by intersecting token group claims (or `/me/transitiveMemberOf` on groups-overage) with `/config/group-role-map.json` in the SPE system container.
 7. BFF creates a session: encrypts tokens + role snapshot with the Key Vault session encryption key, writes `/sessions/{sessionId}.json` to the system container.
 8. BFF sets a signed cookie (`HttpOnly` + `Secure` + `SameSite=Strict`, signed with the Key Vault cookie HMAC key), redirects to SPA.
 
@@ -118,7 +120,39 @@ The image runs a Node.js (TypeScript) BFF process that:
   - `admin/` — workspace + mapping CRUD, audit query proxy to App Insights.
   - `agent/` — v1 stub returning 501; shape designed for SPE Copilot Chat SDK drop-in.
   - `obs/` — App Insights initialization, structured audit helper, error tracking.
-- **API surface:** see section 5 of the brainstorming; echoed in `docs/superpowers/specs/api.md` (to be generated alongside implementation).
+- **API surface:** full list under "BFF API" below; OpenAPI schema generated from Zod and committed to `docs/superpowers/specs/api.md` during implementation.
+
+### BFF API (v1)
+
+```
+POST /api/auth/login                 redirect to Entra ID authorize
+GET  /api/auth/callback              code exchange; set cookie
+POST /api/auth/logout                destroy session
+GET  /api/auth/me                    current identity + role + workspace list
+
+GET  /api/workspaces                 workspaces the user can see
+GET  /api/workspaces/:ws/teams       teams within workspace the user belongs to
+
+GET  /api/files?ws=&team=&year=&month=    list, only-own filter
+GET  /api/files/:id                        metadata
+GET  /api/files/:id/preview                short-lived SharePoint embed URL
+POST /api/files/:id/share                  create view-only, no-download link
+
+POST /api/upload                     multipart; file + metadata; returns item id
+GET  /api/search?ws=&q=               filename + column metadata
+
+GET    /api/admin/workspaces              admin list
+POST   /api/admin/workspaces              admin create
+PATCH  /api/admin/workspaces/:ws          admin update (archive)
+GET    /api/admin/group-mapping           admin list
+PUT    /api/admin/group-mapping           admin replace
+GET    /api/admin/audit                   admin KQL-backed audit query (canned params)
+
+ALL  /api/agent/*                    501 Not Implemented (reserved)
+
+GET  /health                         liveness
+GET  /ready                          readiness (Graph + KV reachable)
+```
 
 ### SPE data layout
 
@@ -174,8 +208,6 @@ Gated on `AppAdmin`. Three tabs:
 Self-grant of `AppAdmin` from inside the app is not possible; admin-role assignment remains an Entra ID operation.
 
 ## 8. Security posture
-
-Summary (details were iterated during brainstorming):
 
 - **Identity:** Entra SSO only; Conditional Access inherited from tenant; BFF validates every token (issuer, audience, signature, expiry); no local accounts.
 - **Session:** signed `HttpOnly`+`Secure`+`SameSite=Strict` cookie; server-side encrypted session JSON in SPE system container; 8h sliding / 24h absolute TTL; logout destroys the session file and cookie.
@@ -252,7 +284,7 @@ infra/
     └── aad-app/        # azuread_application + SP + app role + redirect URIs; writes client secret to KV
 ```
 
-**Terraform-managed:** everything repeatable — resource group, Managed Identity, Key Vault (with secret placeholders), Storage Account, ACR, Log Analytics + App Insights, Container Apps environment and app, Entra app registration + SP + `AppAdmin` role + redirect URIs, the AAD password pushed into KV.
+**Terraform-managed:** everything repeatable — resource group, Managed Identity, Key Vault (with secret placeholders), Storage Account, ACR, Log Analytics + App Insights, Container Apps environment and app, Entra app registration + SP + `AppAdmin` app role + redirect URIs, and the generated AAD app client secret (managed via `azuread_application_password`) pushed into KV as `aad-client-secret`.
 
 **Out-of-band (one-time tenant consent):** SPE Container Type registration (PowerShell, tenant admin), initial SPE system container creation (via app bootstrap endpoint), Entra security-group creation (owned by IT), Conditional Access policies. Documented in `docs/runbooks/tenant-setup.md`.
 
