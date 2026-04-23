@@ -26,14 +26,19 @@ export const SecretsSchema = z.object({
 });
 export type Secrets = z.infer<typeof SecretsSchema>;
 
-export const MetadataFieldSchema = z.object({
-  name: z.string().min(1).regex(/^[A-Z][A-Za-z0-9]*$/, 'PascalCase required'),
-  type: z.enum(['string', 'number', 'date', 'enum']),
-  required: z.boolean(),
-  indexed: z.boolean(),
-  enumValues: z.array(z.string()).optional(),
-  description: z.string().optional(),
-});
+export const MetadataFieldSchema = z
+  .object({
+    name: z.string().min(1).regex(/^[A-Z][A-Za-z0-9]*$/, 'PascalCase required'),
+    type: z.enum(['string', 'number', 'date', 'enum']),
+    required: z.boolean(),
+    indexed: z.boolean(),
+    enumValues: z.array(z.string().min(1)).optional(),
+    description: z.string().max(500).optional(),
+  })
+  .refine(
+    (f) => f.type !== 'enum' || (f.enumValues !== undefined && f.enumValues.length > 0),
+    { message: 'enumValues must be a non-empty array when type is "enum"', path: ['enumValues'] },
+  );
 
 export const WorkspaceConfigSchema = z.object({
   id: z.string().min(1).regex(/^[a-z0-9-]+$/, 'lowercase-kebab required'),
@@ -74,7 +79,13 @@ export const UploadRequestSchema = z.object({
   teamCode: z.string().min(1),
   year: z.number().int().min(2000).max(2100),
   month: z.number().int().min(1).max(12),
-  metadata: z.record(z.union([z.string(), z.number()])),
+  metadata: z.record(
+    z.string().min(1).max(128),
+    z.union([z.string().max(1024), z.number()]),
+  ).refine(
+    (obj) => Object.keys(obj).length <= 50,
+    { message: 'metadata may not contain more than 50 keys' },
+  ),
 });
 export type UploadRequest = z.infer<typeof UploadRequestSchema>;
 
