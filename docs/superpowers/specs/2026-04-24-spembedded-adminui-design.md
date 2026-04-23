@@ -8,9 +8,13 @@
 
 ## 1. Purpose
 
-A Fluent UI + React SPA that provides a SharePoint-like experience for browsing, uploading, searching, and securely sharing files hosted in SharePoint Embedded (SPE) file-storage containers. Initial use case is **Accounts Payable invoice management**; the app is designed to support additional workspaces (HR documents, contracts, etc.) without code changes.
+A Fluent UI + React SPA that provides a secure, SharePoint-like file-management experience over SharePoint Embedded (SPE) containers — usable for **any organizational file-storage use case**: AP invoices, contracts, HR documents, compliance records, vendor onboarding, and so on.
 
-The app is intentionally structured so that **end users' identities flow through every operation** (SSO, OBO-mediated Graph calls, internal-only sharing with no-download semantics) and the **backend is the sole path to SharePoint Embedded**, giving us consistent server-side authorization, filtering, and auditing.
+Each use case is a **workspace**: a separately provisioned SPE container with its own metadata schema and its own team access map. All workspaces share an identical capability contract (write-once uploads, only-own visibility, admin-only modify/delete, internal-only view-only no-download sharing). Adding a new use case to a deployment is an admin configuration action, not a code change.
+
+**Accounts Payable invoices ships as a preconfigured workspace template** so the deployment is useful on day one; additional workspaces (contracts, HR, etc.) are added by admins using the same UI.
+
+The app is structured so that **end users' identities flow through every operation** (SSO, OBO-mediated Graph calls, internal-only sharing with no-download semantics) and the **backend is the sole path to SharePoint Embedded**, giving consistent server-side authorization, filtering, and auditing across every workspace.
 
 Future extension: an AI agent flyout (Copilot-style) that answers questions and performs workflows over the user's accessible files.
 
@@ -18,7 +22,7 @@ Future extension: an AI agent flyout (Copilot-style) that answers questions and 
 
 | Area | Decision |
 |---|---|
-| Tenancy | Single-tenant, multi-workspace (one deployment hosts AP Invoices and any future workspaces). |
+| Tenancy | Single-tenant, multi-workspace. One deployment hosts an unbounded number of workspaces (invoices, contracts, HR, …), each backed by its own SPE container, all sharing one capability contract. AP Invoices is the preconfigured seed template. |
 | Auth pattern | **BFF + OBO** for user-scoped operations; **app-only SP** for admin provisioning and item-permission grants at upload. No MSAL.js in the browser — MSAL-Node runs server-side. |
 | SPE container model | One container per workspace, team folders inside. Plus one **system container** (SP-only access, invisible to end users) for runtime config + sessions. |
 | Admin/team source | Team membership from Entra ID security groups mapped via a JSON config in the system container. Admin role is the Entra **app role** `AppAdmin` on the app registration (never configurable at runtime). |
@@ -34,6 +38,32 @@ Future extension: an AI agent flyout (Copilot-style) that answers questions and 
 | Preview | SharePoint native web viewer (SPE `/preview` embed URL) for supported types; non-supported types show "Preview unavailable." |
 | IaC | Terraform for all repeatable Azure resources; SPE Container Type registration is a documented one-time tenant-admin step. |
 | Cost envelope | ≤ $100/month for production (current estimate $35–75). |
+
+### Workspace capability contract
+
+Every workspace — AP Invoices, Contracts, HR, or any future addition — behaves identically. The contract is enforced in the BFF, not in per-workspace code, and no workspace can opt out:
+
+- Uploads are **write-once** for uploaders. Only admins can modify or delete after upload.
+- Visibility is **only-own** for non-admin members. Admins see everything.
+- Sharing is **internal-only, view-only, no-download**, with required expiry.
+- Files live in a dedicated SPE container provisioned per workspace.
+- Files are organized by a workspace-defined folder convention (default: `Team / Year / Month`; configurable per workspace).
+- Metadata fields are workspace-specific and declared in `workspaces.json`.
+- Team access is workspace-specific and declared in `group-role-map.json` (Entra group → team within workspace).
+- Admins are global to the deployment; any admin can administer any workspace.
+
+### Built-in workspace templates (seed configs)
+
+The admin "Create workspace" flow offers templates that pre-fill the metadata schema, folder convention, and default permissions. Templates ship with the app and can be edited before provisioning:
+
+| Template | Metadata fields | Folder convention | Typical teams |
+|---|---|---|---|
+| `invoices` (default) | Vendor, InvoiceNumber, Amount, Currency | Team / Year / Month | AP team + uploader teams |
+| `contracts` | Counterparty, ContractNumber, EffectiveDate, ExpirationDate, Status | Counterparty / Year | Legal + owning-business-unit |
+| `hr-docs` | EmployeeId, DocumentType, EffectiveDate, Confidentiality | DocumentType / Year | HR team + individual-employee read scope |
+| `blank` | (none — admin adds fields) | Year / Month | (admin configures) |
+
+Templates are shipped as JSON files in the image (`server/templates/workspaces/*.json`) and copied into `workspaces.json` at provisioning time. Admins can edit the copy freely — the template is a starting point, not a lock.
 
 ## 3. Architecture
 
@@ -189,7 +219,7 @@ Paths:
 
 ## 6. UI/UX decisions
 
-- **Welcome page** — product name (placeholder "Invoice Vault" — brand name is a tenant-configurable setting), short pitch, single Microsoft sign-in button.
+- **Welcome page** — product name (generic default "Docs Vault" — brand name is a per-deployment setting in `app-settings.json`, admin-editable), short pitch, single Microsoft sign-in button. The pitch text is also a setting so each deployment can describe its own use-case mix.
 - **Workspace picker** — tile grid for users with access to multiple workspaces; dimmed tiles for those without access, with an explanation.
 - **File browser** — three-pane: folder tree · file list · preview pane with metadata and "Share" CTA. Teammates' uploads shown as an explicit dimmed "hidden by only-own policy" row rather than silently omitted.
 - **Upload wizard** — drag-drop zone primary; metadata panel to the right enables after drop. Stepper surfaces 3 phases (File · Categorize · Invoice details). Keyboard-equivalent "Browse files" button.
@@ -201,7 +231,7 @@ Paths:
 
 Gated on `AppAdmin`. Three tabs:
 
-- **Workspaces** — list, create, archive. Creating a workspace provisions a new SPE container via app-only Graph, registers the metadata column schema, writes the entry to `workspaces.json`. Archive marks the workspace hidden without deleting the container.
+- **Workspaces** — list, create (from a template), archive. Creating a workspace starts from one of the built-in templates (`invoices`, `contracts`, `hr-docs`, `blank`); the admin can edit the metadata schema, folder convention, and display name before provisioning. Provisioning calls app-only Graph to create the SPE container, registers the metadata column schema on it, and writes the entry to `workspaces.json`. Archive marks the workspace hidden without deleting the container.
 - **Group mapping** — table of `(Entra group → role → workspace → team)`. Admins pick groups via a BFF-proxied `/groups?$search=` endpoint. Saving writes `group-role-map.json`; in-flight sessions re-resolve within 5 minutes.
 - **Audit viewer** — canned KQL queries against Log Analytics, parameterized by user OID, workspace, action type, and time range. No raw KQL input from the UI.
 
@@ -389,7 +419,7 @@ See `CLAUDE.md` at the repository root for the full workflow, commands, and conv
 - **Defender for Storage.** Upgrade path documented.
 - **Third environment beyond prod + staging.** PR preview slots if needed.
 - **Full-text search inside file contents.** v1 searches filename + column metadata; content search deferred.
-- **Workspace-configurable metadata schema editor.** Schema shape is present in `workspaces.json`; AP workspace ships with fixed fields. UI editor for schema deferred to when a second workspace is actually onboarded.
+- **Rich drag-and-drop field builder UI.** v1 ships with **JSON-based editing** of the per-workspace metadata schema in the admin surface (validated against a Zod schema on save) plus built-in templates. A richer point-and-click field builder is deferred.
 - **External identity providers.** Entra ID only.
 
 ## 18. Open questions / notes
