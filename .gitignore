@@ -138,3 +138,25 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .superpowers/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.docker
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
