@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EnvSchema,
+  MetadataFieldSchema,
   UploadRequestSchema,
   ShareRequestSchema,
   WorkspaceConfigSchema,
@@ -113,5 +114,85 @@ describe('GroupRoleMapEntrySchema', () => {
         teamDisplayName: 'Team Alpha',
       }),
     ).toThrow();
+  });
+});
+
+describe('UploadRequestSchema metadata bounds', () => {
+  const base = {
+    workspaceId: 'ap-invoices',
+    teamCode: 'ALPHA',
+    year: 2026,
+    month: 4,
+  };
+
+  it('rejects metadata with more than 50 keys', () => {
+    const metadata: Record<string, string> = {};
+    for (let i = 0; i < 51; i++) metadata[`F${i}`] = 'v';
+    expect(() => UploadRequestSchema.parse({ ...base, metadata })).toThrow();
+  });
+
+  it('rejects metadata string values longer than 1024 chars', () => {
+    expect(() =>
+      UploadRequestSchema.parse({
+        ...base,
+        metadata: { Vendor: 'x'.repeat(1025) },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects metadata keys longer than 128 chars', () => {
+    const longKey = 'K'.repeat(129);
+    expect(() =>
+      UploadRequestSchema.parse({
+        ...base,
+        metadata: { [longKey]: 'v' },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('MetadataFieldSchema enumValues refinement', () => {
+  it('accepts type=string with no enumValues', () => {
+    const r = MetadataFieldSchema.parse({
+      name: 'Vendor',
+      type: 'string',
+      required: true,
+      indexed: true,
+    });
+    expect(r.type).toBe('string');
+  });
+
+  it('rejects type=enum with no enumValues', () => {
+    expect(() =>
+      MetadataFieldSchema.parse({
+        name: 'Status',
+        type: 'enum',
+        required: true,
+        indexed: true,
+      }),
+    ).toThrow();
+  });
+
+  it('rejects type=enum with empty enumValues array', () => {
+    expect(() =>
+      MetadataFieldSchema.parse({
+        name: 'Status',
+        type: 'enum',
+        required: true,
+        indexed: true,
+        enumValues: [],
+      }),
+    ).toThrow();
+  });
+
+  it('accepts type=enum with non-empty enumValues', () => {
+    const r = MetadataFieldSchema.parse({
+      name: 'Status',
+      type: 'enum',
+      required: true,
+      indexed: true,
+      enumValues: ['draft', 'approved'],
+    });
+    expect(r.enumValues).toEqual(['draft', 'approved']);
   });
 });
