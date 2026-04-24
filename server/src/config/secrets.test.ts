@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getSecretMock = jest.fn<(...args: any[]) => any>();
+type GetSecretResult = { value?: string | undefined };
+const getSecretMock = jest.fn<(name: string) => Promise<GetSecretResult>>();
 
 jest.unstable_mockModule('@azure/keyvault-secrets', () => ({
   SecretClient: jest.fn().mockImplementation(() => ({ getSecret: getSecretMock })),
