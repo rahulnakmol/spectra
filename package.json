@@ -2,8 +2,14 @@
   "name": "spembedded-adminui",
   "private": true,
   "version": "0.0.0",
-  "engines": { "node": "20.x" },
-  "workspaces": ["shared", "server", "web"],
+  "engines": {
+    "node": "20.x"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
   "scripts": {
     "typecheck": "npm -ws --if-present run typecheck",
     "lint": "npm -ws --if-present run lint",
@@ -14,12 +20,14 @@
     "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spembedded-adminui:dev"
   },
   "devDependencies": {
-    "typescript": "5.4.5",
     "@types/node": "20.12.7",
-    "eslint": "8.57.0",
-    "@typescript-eslint/parser": "7.7.0",
     "@typescript-eslint/eslint-plugin": "7.7.0",
+    "@typescript-eslint/parser": "7.7.0",
+    "cross-env": "^10.1.0",
+    "eslint": "8.57.0",
+    "eslint-config-prettier": "9.1.0",
     "prettier": "3.2.5",
-    "eslint-config-prettier": "9.1.0"
+    "ts-node": "^10.9.2",
+    "typescript": "5.4.5"
   }
 }
