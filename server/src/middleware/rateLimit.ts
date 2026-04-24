@@ -21,13 +21,18 @@ export function rateLimit(opts: RateLimitOptions): RequestHandler {
     bucket.lastRefill = now;
 
     if (bucket.tokens < 1) {
+      // No buckets.set() here — intentional.
+      // A first-touch new key never reaches this branch: capacity >= 1 ensures
+      // tokens starts at capacity (>= 1). For known keys the map already holds
+      // this object reference, so mutations to bucket.tokens/lastRefill above
+      // propagate without a redundant set().
       const wait = opts.refillPerSec > 0 ? Math.ceil((1 - bucket.tokens) / opts.refillPerSec) : 60;
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({ error: 'rate_limited', message: 'Too many requests' });
       return;
     }
     bucket.tokens -= 1;
-    buckets.set(key, bucket);
+    buckets.set(key, bucket); // first insertion for a new key happens here (on success)
     next();
   };
 }
