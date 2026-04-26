@@ -1,12 +1,17 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import nodeFetch from 'node-fetch';
 import nock from 'nock';
 import { createGraphClient } from './client.js';
 
 // Node 20+ ships built-in fetch (undici), which nock cannot intercept.
 // Override global.fetch with node-fetch v2 so nock's http interceptors work.
+let originalFetch: typeof globalThis.fetch;
 beforeAll(() => {
+  originalFetch = global.fetch;
   global.fetch = nodeFetch as unknown as typeof fetch;
+});
+afterAll(() => {
+  global.fetch = originalFetch;
 });
 
 describe('createGraphClient', () => {

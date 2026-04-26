@@ -6,7 +6,7 @@ import {
   type GraphRequest,
   type Middleware,
 } from '@microsoft/microsoft-graph-client';
-import 'isomorphic-fetch';
+import { UpstreamError } from '../errors/domain.js';
 import { mapGraphErrorToDomain, type GraphLikeError, type GraphTokenAcquirer } from './types.js';
 
 class TokenAcquirerProvider implements AuthenticationProvider {
@@ -45,7 +45,10 @@ export function createGraphClient(acquire: GraphTokenAcquirer): SpeGraphClient {
             try {
               return await (value as (...a: unknown[]) => Promise<unknown>).apply(target, args);
             } catch (err) {
-              throw mapGraphErrorToDomain(err as GraphLikeError);
+              if (err !== null && typeof err === 'object' && 'statusCode' in err) {
+                throw mapGraphErrorToDomain(err as GraphLikeError);
+              }
+              throw new UpstreamError('Graph request failed', { upstream: String(err) }, err);
             }
           };
         },
