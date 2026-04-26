@@ -37,9 +37,28 @@ function makeApp(session: SessionClaims, store: ConfigStore) {
 }
 
 describe('admin routes', () => {
-  it('all routes 403 for non-admin', async () => {
-    const r = await request(makeApp(member, makeStore())).get('/api/admin/workspaces');
+  it.each([
+    ['get', '/api/admin/workspaces'],
+    ['post', '/api/admin/workspaces'],
+    ['patch', '/api/admin/workspaces/any'],
+    ['get', '/api/admin/group-mapping'],
+    ['put', '/api/admin/group-mapping'],
+    ['get', '/api/admin/audit'],
+  ])('%s %s returns 403 for non-admin', async (method, url) => {
+    const app = makeApp(member, makeStore());
+    const agent = request(app) as unknown as Record<string, (u: string) => { send: (b: object) => Promise<{ status: number }> }>;
+    const r = await agent[method as string]!(url as string).send({});
     expect(r.status).toBe(403);
+  });
+
+  it('POST /api/admin/workspaces returns 409 for duplicate id', async () => {
+    const store = makeStore([
+      { id: 'existing', displayName: 'E', template: 'blank', containerId: 'C', folderConvention: ['YYYY'], metadataSchema: [], archived: false, createdAt: '2026-01-01T00:00:00Z', createdByOid: '00000000-0000-0000-0000-000000000000' },
+    ]);
+    const r = await request(makeApp(admin, store))
+      .post('/api/admin/workspaces')
+      .send({ id: 'existing', template: 'blank' });
+    expect(r.status).toBe(409);
   });
 
   it('GET /api/admin/workspaces lists all (incl archived)', async () => {

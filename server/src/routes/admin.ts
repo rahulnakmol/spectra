@@ -4,10 +4,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
-  GroupRoleMapSchema, WorkspaceConfigSchema, type GroupRoleMapEntry,
+  GroupRoleMapSchema, MetadataFieldSchema, WorkspaceConfigSchema, type GroupRoleMapEntry,
   type WorkspaceConfig, type WorkspaceTemplate,
 } from '@spectra/shared';
-import { BadRequestError, NotFoundError, UnauthenticatedError } from '../errors/domain.js';
+import { BadRequestError, ConflictError, NotFoundError, UnauthenticatedError, UpstreamError } from '../errors/domain.js';
 import { audit } from '../obs/audit.js';
 import { requireAuth } from '../auth/session.js';
 import { requireRole } from '../authz/guards.js';
@@ -15,6 +15,13 @@ import type { ConfigStore } from '../store/configStore.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = path.resolve(here, '../../templates/workspaces');
+
+const TemplateFileSchema = z.object({
+  displayName: z.string().min(1),
+  template: z.enum(['invoices', 'contracts', 'hr-docs', 'blank']),
+  folderConvention: z.array(z.string()).min(1),
+  metadataSchema: z.array(MetadataFieldSchema),
+});
 
 const CreateWorkspaceSchema = z.object({
   id: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -59,12 +66,18 @@ async function loadTemplate(name: WorkspaceTemplate): Promise<{
 }> {
   const file = path.join(TEMPLATE_DIR, `${name}.json`);
   const raw = await readFile(file, 'utf8');
-  return JSON.parse(raw) as {
-    displayName: string;
-    template: WorkspaceTemplate;
-    folderConvention: string[];
-    metadataSchema: WorkspaceConfig['metadataSchema'];
-  };
+  try {
+    // Cast is safe: TemplateFileSchema uses MetadataFieldSchema; the type mismatch is a
+    // Zod+exactOptionalPropertyTypes quirk (inferred `T | undefined` vs absent-only optional).
+    return TemplateFileSchema.parse(JSON.parse(raw)) as {
+      displayName: string;
+      template: WorkspaceTemplate;
+      folderConvention: string[];
+      metadataSchema: WorkspaceConfig['metadataSchema'];
+    };
+  } catch (err) {
+    throw new UpstreamError(`Template file invalid: ${name}`, undefined, err);
+  }
 }
 
 export function adminRouter(deps: AdminRouterDeps): Router {
@@ -82,10 +95,10 @@ export function adminRouter(deps: AdminRouterDeps): Router {
     try {
       if (!req.session) throw new UnauthenticatedError();
       const parse = CreateWorkspaceSchema.safeParse(req.body);
-      if (!parse.success) throw new BadRequestError('Invalid request', { issues: parse.error.message });
+      if (!parse.success) throw new BadRequestError('Invalid request');
       const cfg = await deps.store.getWorkspaces();
       if (cfg.workspaces.some((w) => w.id === parse.data.id)) {
-        throw new BadRequestError('Workspace id already exists');
+        throw new ConflictError('Workspace id already exists');
       }
       const tpl = await loadTemplate(parse.data.template);
       const containerId = await deps.provisionContainer(parse.data.id, parse.data.displayName ?? tpl.displayName);
@@ -101,7 +114,7 @@ export function adminRouter(deps: AdminRouterDeps): Router {
         createdByOid: req.session.userOid,
       }) as WorkspaceConfig;
       await deps.store.putWorkspaces({ workspaces: [...cfg.workspaces, ws] });
-      audit({ userOid: req.session.userOid, action: 'admin.workspace.create', workspace: ws.id, outcome: 'success' });
+      audit({ userOid: req.session.userOid, action: 'admin.workspace.create', workspace: ws.id, resourceId: containerId, outcome: 'success' });
       res.status(201).json({ workspace: ws });
     } catch (err) { next(err); }
   };
@@ -110,7 +123,7 @@ export function adminRouter(deps: AdminRouterDeps): Router {
     try {
       if (!req.session) throw new UnauthenticatedError();
       const parse = PatchWorkspaceSchema.safeParse(req.body);
-      if (!parse.success) throw new BadRequestError('Invalid patch', { issues: parse.error.message });
+      if (!parse.success) throw new BadRequestError('Invalid patch');
       const cfg = await deps.store.getWorkspaces();
       const idx = cfg.workspaces.findIndex((w) => w.id === req.params['ws']);
       if (idx < 0) throw new NotFoundError('Workspace not found');
@@ -124,7 +137,7 @@ export function adminRouter(deps: AdminRouterDeps): Router {
       const updatedList = [...cfg.workspaces];
       updatedList[idx] = updated;
       await deps.store.putWorkspaces({ workspaces: updatedList });
-      audit({ userOid: req.session.userOid, action: 'admin.workspace.update', workspace: updated.id, outcome: 'success' });
+      audit({ userOid: req.session.userOid, action: 'admin.workspace.update', workspace: updated.id, resourceId: updated.containerId, outcome: 'success' });
       res.json({ workspace: updated });
     } catch (err) { next(err); }
   };
@@ -140,7 +153,7 @@ export function adminRouter(deps: AdminRouterDeps): Router {
     try {
       if (!req.session) throw new UnauthenticatedError();
       const parse = GroupRoleMapSchema.safeParse(req.body);
-      if (!parse.success) throw new BadRequestError('Invalid mapping', { issues: parse.error.message });
+      if (!parse.success) throw new BadRequestError('Invalid mapping');
       const seen = new Set<string>();
       for (const e of parse.data.entries as GroupRoleMapEntry[]) {
         const key = `${e.entraGroupId}|${e.workspaceId}|${e.teamCode}`;
@@ -156,7 +169,7 @@ export function adminRouter(deps: AdminRouterDeps): Router {
   const auditEndpoint: RequestHandler = async (req, res, next) => {
     try {
       const parse = AuditQuerySchema.safeParse(req.query);
-      if (!parse.success) throw new BadRequestError('Invalid audit query', { issues: parse.error.message });
+      if (!parse.success) throw new BadRequestError('Invalid audit query');
       const out = await deps.auditQuery(parse.data);
       res.json(out);
     } catch (err) { next(err); }
