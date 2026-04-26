@@ -78,7 +78,8 @@ describe('auth routes', () => {
     // Use a valid 16+ char session ID
     const sid = 'SIDaaBBccDDeeFfGg';
     await store.put({ sessionId: sid, userOid: 'O', tenantId: 'T', isAdmin: false,
-      teamMemberships: [], issuedAt: Date.now(), expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now() } as never);
+      teamMemberships: [], issuedAt: Date.now(), absoluteExpiresAt: Date.now() + 86400_000,
+      expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now() } as never);
     const r = await request(makeApp(makeMsal(), store))
       .post('/api/auth/logout')
       .set('Cookie', `${SESSION_COOKIE_NAME}=${signSessionCookie(sid, HMAC)}`);
@@ -97,7 +98,8 @@ describe('auth routes', () => {
     const sid = 'SIDaaBBccDDeeFfGg';
     await store.put({ sessionId: sid, userOid: 'O', tenantId: 'T', isAdmin: true,
       teamMemberships: [{ workspaceId: 'invoices', teamCode: 'AP', teamDisplayName: 'AP Team' }],
-      issuedAt: Date.now(), expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now() } as never);
+      issuedAt: Date.now(), absoluteExpiresAt: Date.now() + 86400_000,
+      expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now() } as never);
     const r = await request(makeApp(makeMsal(), store))
       .get('/api/auth/me')
       .set('Cookie', `${SESSION_COOKIE_NAME}=${signSessionCookie(sid, HMAC)}`);

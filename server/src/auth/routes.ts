@@ -59,7 +59,8 @@ export function authRouter(deps: AuthRouterDeps): Router {
         isAdmin: role.isAdmin,
         teamMemberships: role.teamMemberships,
         issuedAt: now,
-        expiresAt: Math.min(now + absoluteMs, now + slidingMs),
+        absoluteExpiresAt: now + absoluteMs,
+        expiresAt: now + slidingMs,
         lastSlidingUpdate: now,
       });
       const signed = signSessionCookie(sessionId, deps.hmacKey);

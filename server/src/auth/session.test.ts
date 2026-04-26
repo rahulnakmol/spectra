@@ -20,7 +20,8 @@ function makeStore(initial: SessionClaims | null): SessionStore {
 
 const baseClaims: SessionClaims = {
   sessionId: 'SIDaaBBccDDeeFfGg', userOid: 'OID', tenantId: 'TID', isAdmin: false,
-  teamMemberships: [], issuedAt: Date.now(), expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now(),
+  teamMemberships: [], issuedAt: Date.now(), absoluteExpiresAt: Date.now() + 86400_000,
+  expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now(),
 };
 
 function makeApp(store: SessionStore) {

@@ -23,7 +23,8 @@ function makeBackends(seed: Record<string, string> = {}) {
 
 const claims: SessionClaims = {
   sessionId: 'S1aBcDeFgHiJkLmN', userOid: 'U1', tenantId: 'T1', isAdmin: false,
-  teamMemberships: [], issuedAt: 1, expiresAt: 9_999_999_999_999, lastSlidingUpdate: 1,
+  teamMemberships: [], issuedAt: 1, absoluteExpiresAt: 9_999_999_999_999,
+  expiresAt: 9_999_999_999_999, lastSlidingUpdate: 1,
 };
 
 describe('SessionStore', () => {

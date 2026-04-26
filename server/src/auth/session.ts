@@ -46,12 +46,12 @@ export function sessionMiddleware(opts: SessionMiddlewareOpts): RequestHandler {
     }
     if (!claims) return next();
     const now = Date.now();
-    if (claims.expiresAt <= now) {
+    if (claims.expiresAt <= now || claims.absoluteExpiresAt <= now) {
       try { await opts.store.delete(sessionId); } catch { /* best-effort cleanup */ }
       return next();
     }
     if (now - claims.lastSlidingUpdate >= slideIntervalMs) {
-      const newExpires = Math.min(claims.expiresAt, now + slidingMs);
+      const newExpires = Math.min(claims.absoluteExpiresAt, now + slidingMs);
       const updated: SessionClaims = { ...claims, expiresAt: newExpires, lastSlidingUpdate: now };
       try { await opts.store.put(updated); } catch (err) { return next(err); }
       claims = updated;
