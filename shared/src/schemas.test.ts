@@ -6,6 +6,8 @@ import {
   ShareRequestSchema,
   WorkspaceConfigSchema,
   GroupRoleMapEntrySchema,
+  ListFilesQuerySchema,
+  SearchQuerySchema,
 } from './schemas.js';
 
 describe('EnvSchema', () => {
@@ -148,6 +150,24 @@ describe('UploadRequestSchema metadata bounds', () => {
         metadata: { [longKey]: 'v' },
       }),
     ).toThrow();
+  });
+});
+
+describe('list/search query schemas', () => {
+  it('parses required workspaceId', () => {
+    expect(ListFilesQuerySchema.parse({ ws: 'invoices' })).toEqual({ ws: 'invoices' });
+  });
+  it('coerces year/month to numbers', () => {
+    const out = ListFilesQuerySchema.parse({ ws: 'invoices', year: '2026', month: '4' });
+    expect(out.year).toBe(2026);
+    expect(out.month).toBe(4);
+  });
+  it('rejects invalid month', () => {
+    expect(() => ListFilesQuerySchema.parse({ ws: 'invoices', month: '13' })).toThrow();
+  });
+  it('search requires q ≥ 2 chars', () => {
+    expect(() => SearchQuerySchema.parse({ ws: 'invoices', q: 'a' })).toThrow();
+    expect(SearchQuerySchema.parse({ ws: 'invoices', q: 'ab' }).q).toBe('ab');
   });
 });
 
