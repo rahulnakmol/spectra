@@ -1,3 +1,5 @@
+import { ConflictError } from '../errors/domain.js';
+
 export function renderFolderSegments(
   convention: string[],
   ctx: { team: string; year: number; month: number },
@@ -19,9 +21,9 @@ export async function resolveCollision(
   const dot = baseName.lastIndexOf('.');
   const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
   const ext = dot > 0 ? baseName.slice(dot) : '';
-  for (let i = 2; i < maxAttempts; i++) {
+  for (let i = 2; i <= maxAttempts; i++) {
     const candidate = `${stem}-${i}${ext}`;
     if (!(await exists(candidate))) return candidate;
   }
-  throw new Error(`resolveCollision: exceeded ${maxAttempts} attempts`);
+  throw new ConflictError(`Could not resolve filename collision after ${maxAttempts} attempts`);
 }

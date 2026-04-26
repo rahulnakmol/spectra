@@ -30,6 +30,7 @@ const upload = multer({
 export function uploadRouter(deps: UploadRouterDeps): Router {
   const r = Router();
   const handler: RequestHandler = async (req, res, next) => {
+    let upreqWorkspaceId: string | undefined;
     try {
       if (!req.session) throw new UnauthenticatedError();
       if (!req.file) throw new BadRequestError('Missing file');
@@ -43,6 +44,7 @@ export function uploadRouter(deps: UploadRouterDeps): Router {
       });
       if (!reqParse.success) throw new BadRequestError('Invalid request', { issues: reqParse.error.message });
       const upreq = reqParse.data;
+      upreqWorkspaceId = upreq.workspaceId;
 
       const teamMember = req.session.teamMemberships.find(
         (t) => t.workspaceId === upreq.workspaceId && t.teamCode === upreq.teamCode,
@@ -52,7 +54,7 @@ export function uploadRouter(deps: UploadRouterDeps): Router {
       validateMetadataAgainstSchema(upreq.metadata, workspace.metadataSchema);
 
       const safeName = sanitizeFilename(req.file.originalname);
-      await detectAndValidateMime(req.file.buffer, safeName);
+      const { mime } = await detectAndValidateMime(req.file.buffer, safeName);
 
       const segments = renderFolderSegments(workspace.folderConvention, {
         team: teamMember?.teamDisplayName ?? upreq.teamCode,
@@ -72,8 +74,6 @@ export function uploadRouter(deps: UploadRouterDeps): Router {
         }
       });
 
-      const ext = finalName.split('.').pop()?.toLowerCase() ?? 'bin';
-      const mime = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
       let item;
       try {
         item = await uploadSmallFile(userClient, driveId, folder.folderId, finalName, req.file.buffer, mime);
@@ -108,6 +108,7 @@ export function uploadRouter(deps: UploadRouterDeps): Router {
         userOid: req.session?.userOid ?? 'anonymous',
         action: 'files.upload',
         outcome: 'failure',
+        ...(upreqWorkspaceId !== undefined ? { workspace: upreqWorkspaceId } : {}),
         detail: { reason: err instanceof Error ? err.message : 'unknown' },
       });
       next(err);
@@ -141,6 +142,9 @@ function validateMetadataAgainstSchema(meta: Record<string, unknown>, schema: Me
     if (value === undefined) continue;
     if (field.type === 'string' && typeof value !== 'string') throw new BadRequestError(`Field "${field.name}" must be string`);
     if (field.type === 'number' && typeof value !== 'number') throw new BadRequestError(`Field "${field.name}" must be number`);
+    if (field.type === 'date' && (typeof value !== 'string' || isNaN(Date.parse(value)))) {
+      throw new BadRequestError(`Field "${field.name}" must be an ISO date string`);
+    }
     if (
       field.type === 'enum' &&
       (typeof value !== 'string' || !(field.enumValues?.includes(value) ?? false))
