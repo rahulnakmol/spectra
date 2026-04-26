@@ -1,5 +1,5 @@
 {
-  "name": "spembedded-adminui",
+  "name": "spectra",
   "private": true,
   "version": "0.0.0",
   "engines": {
@@ -14,10 +14,10 @@
     "typecheck": "npm -ws --if-present run typecheck",
     "lint": "npm -ws --if-present run lint",
     "test": "npm -ws --if-present run test",
-    "build": "npm -w @adminui/shared --if-present run build && npm -w @adminui/server --if-present run build && npm -w @adminui/web --if-present run build",
-    "dev": "npm -w @adminui/server --if-present run dev",
-    "docker:build": "docker build -t spembedded-adminui:dev .",
-    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spembedded-adminui:dev"
+    "build": "npm -w @spectra/shared --if-present run build && npm -w @spectra/server --if-present run build && npm -w @spectra/web --if-present run build",
+    "dev": "npm -w @spectra/server --if-present run dev",
+    "docker:build": "docker build -t spectra:dev .",
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spectra:dev"
   },
   "devDependencies": {
     "@types/node": "20.12.7",

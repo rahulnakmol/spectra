@@ -1,4 +1,4 @@
-import { EnvSchema, type Env } from '@adminui/shared';
+import { EnvSchema, type Env } from '@spectra/shared';
 
 export function loadEnv(source: NodeJS.ProcessEnv | Record<string, unknown> = process.env): Env {
   const result = EnvSchema.safeParse(source);

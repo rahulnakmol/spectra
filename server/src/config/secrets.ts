@@ -1,6 +1,6 @@
 import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
-import { SecretsSchema, type Secrets } from '@adminui/shared';
+import { SecretsSchema, type Secrets } from '@spectra/shared';
 
 const SECRET_NAMES = {
   aadClientSecret: 'aad-client-secret',

@@ -1,6 +1,6 @@
 import { loadEnv } from './env.js';
 import { loadSecrets } from './secrets.js';
-import type { Env, Secrets } from '@adminui/shared';
+import type { Env, Secrets } from '@spectra/shared';
 
 export interface AppConfig {
   env: Env;
