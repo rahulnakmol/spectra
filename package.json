@@ -13,7 +13,7 @@
   "scripts": {
     "typecheck": "npm -ws --if-present run typecheck",
     "lint": "npm -ws --if-present run lint",
-    "test": "npm -ws --if-present run test",
+    "test": "npm -w @spectra/shared run build && npm -ws --if-present run test",
     "build": "npm -w @spectra/shared --if-present run build && npm -w @spectra/server --if-present run build && npm -w @spectra/web --if-present run build",
     "dev": "npm -w @spectra/server --if-present run dev",
     "docker:build": "docker build -t spectra:dev .",
