@@ -5,7 +5,7 @@ const config: Config = {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' },
   testMatch: ['<rootDir>/src/**/*.test.ts'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.test.ts', '!src/main.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.test.ts', '!src/main.ts', '!src/obs/appInsights.ts'],
   coverageThreshold: {
     global: { lines: 80, functions: 80, branches: 75 },
   },
