@@ -16,6 +16,6 @@ export function initAppInsights(connectionString: string): void {
   initialized = true;
 }
 
-export function getAppInsightsClient(): appInsights.TelemetryClient {
+export function getAppInsightsClient(): appInsights.TelemetryClient | undefined {
   return appInsights.defaultClient;
 }

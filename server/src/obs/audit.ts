@@ -14,11 +14,12 @@ export interface AuditRecord {
 
 export function audit(r: AuditRecord): void {
   const client = getAppInsightsClient();
+  // Dev/test runs without a connection string — audit is best-effort, not a request-blocker.
   if (!client) return;
   const { durationMs, detail, ...rest } = r;
   client.trackEvent({
     name: `audit.${r.action}`,
-    properties: { ...rest, ...(detail ?? {}) } as Record<string, string>,
+    properties: { ...rest, ...(detail ?? {}) },
     ...(durationMs !== undefined ? { measurements: { durationMs } } : {}),
   });
 }

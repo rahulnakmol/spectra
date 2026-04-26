@@ -34,6 +34,36 @@ describe('audit', () => {
       measurements: { durationMs: 42 },
     });
   });
+
+  it('omits measurements when durationMs is not provided', () => {
+    audit({ userOid: 'u', action: 'app.start', outcome: 'success' });
+    const call = trackEventMock.mock.calls[0]?.[0];
+    expect(call).toEqual({
+      name: 'audit.app.start',
+      properties: { userOid: 'u', action: 'app.start', outcome: 'success' },
+    });
+    expect(call).not.toHaveProperty('measurements');
+  });
+
+  it('merges detail into properties and preserves number/boolean values', () => {
+    audit({
+      userOid: 'u',
+      action: 'rate.limit',
+      outcome: 'denied',
+      detail: { requested: 5, allowed: false },
+    });
+    expect(trackEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.objectContaining({
+          userOid: 'u',
+          action: 'rate.limit',
+          outcome: 'denied',
+          requested: 5,
+          allowed: false,
+        }),
+      }),
+    );
+  });
 });
 
 describe('hashIp', () => {
@@ -43,4 +73,21 @@ describe('hashIp', () => {
     expect(a).toBe(b);
     expect(a).toHaveLength(64);
   });
+
+  it('produces different hashes for different IPs and different salts', () => {
+    expect(hashIp('1.2.3.4', 'salt')).not.toBe(hashIp('1.2.3.5', 'salt'));
+    expect(hashIp('1.2.3.4', 'salt-a')).not.toBe(hashIp('1.2.3.4', 'salt-b'));
+  });
+});
+
+it('no-ops when App Insights client is unavailable (dev mode)', async () => {
+  jest.resetModules();
+  jest.unstable_mockModule('./appInsights.js', () => ({
+    getAppInsightsClient: () => undefined,
+    initAppInsights: () => {},
+  }));
+  const { audit: auditNoClient } = await import('./audit.js');
+  expect(() => auditNoClient({
+    userOid: 'u', action: 'a', outcome: 'success',
+  })).not.toThrow();
 });
