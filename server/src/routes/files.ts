@@ -77,6 +77,9 @@ export function filesRouter(deps: FilesRouterDeps): Router {
       const wsResult = WsQuerySchema.safeParse(req.query);
       if (!wsResult.success) throw new BadRequestError('Missing or invalid ws');
       const ws = wsResult.data.ws;
+      if (!req.session.isAdmin && !req.session.teamMemberships.some((t) => t.workspaceId === ws)) {
+        throw new ForbiddenError('No access to this workspace');
+      }
       const { driveId } = await resolveWorkspaceContext(deps.store, ws);
       const item = await getItem(deps.graphForUser(req), driveId, req.params['id'] ?? '');
       const fileItem = toFileItem(item);
@@ -99,6 +102,9 @@ export function filesRouter(deps: FilesRouterDeps): Router {
       const wsResult = WsQuerySchema.safeParse(req.query);
       if (!wsResult.success) throw new BadRequestError('Missing or invalid ws');
       const ws = wsResult.data.ws;
+      if (!req.session.isAdmin && !req.session.teamMemberships.some((t) => t.workspaceId === ws)) {
+        throw new ForbiddenError('No access to this workspace');
+      }
       const { driveId } = await resolveWorkspaceContext(deps.store, ws);
       const item = await getItem(deps.graphForUser(req), driveId, req.params['id'] ?? '');
       const fileItem = toFileItem(item);
@@ -108,7 +114,14 @@ export function filesRouter(deps: FilesRouterDeps): Router {
       const url = await getPreviewUrl(deps.graphForUser(req), driveId, item.id);
       audit({ userOid: req.session.userOid, action: 'files.preview', workspace: ws, resourceId: item.id, outcome: 'success' });
       res.json({ previewUrl: url });
-    } catch (err) { next(err); }
+    } catch (err) {
+      if (err instanceof ForbiddenError) {
+        audit({ userOid: req.session?.userOid ?? 'anonymous', action: 'files.preview', outcome: 'denied', detail: { reason: 'access_denied' } });
+      } else if (err instanceof NotFoundError) {
+        audit({ userOid: req.session?.userOid ?? 'anonymous', action: 'files.preview', outcome: 'failure', detail: { reason: 'not_found' } });
+      }
+      next(err);
+    }
   };
 
   r.get('/api/files', requireAuth, list);

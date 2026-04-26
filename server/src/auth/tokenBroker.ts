@@ -4,6 +4,7 @@ import type { MsalClient } from './msal.js';
 export interface TokenBroker {
   obo(ctx: { sessionId: string; userAccessToken: string }, scopes: string[]): Promise<string>;
   app(scopes: string[]): Promise<string>;
+  invalidate(sessionId: string): void;
 }
 
 const TTL_MS = 50 * 60_000;
@@ -28,6 +29,12 @@ export function createTokenBroker(msal: MsalClient): TokenBroker {
       const tok = await msal.acquireAppToken(scopes);
       appCache.set(key, tok);
       return tok;
+    },
+    invalidate(sessionId) {
+      const prefix = `${sessionId}|`;
+      for (const key of oboCache.keys()) {
+        if (key.startsWith(prefix)) oboCache.delete(key);
+      }
     },
   };
 }

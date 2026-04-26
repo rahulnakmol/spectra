@@ -24,10 +24,10 @@ export function searchRouter(deps: SearchRouterDeps): Router {
         throw new ForbiddenError('No access to this workspace');
       }
       const { driveId } = await resolveWorkspaceContext(deps.store, q.ws);
-      const escaped = q.q.replace(/'/g, "''");
+      const encoded = encodeURIComponent(q.q);
       const client = deps.graphForUser(req);
       const resp = await client
-        .api(`/drives/${driveId}/root/search(q='${escaped}')`)
+        .api(`/drives/${driveId}/root/search(q='${encoded}')`)
         .expand('listItem($expand=fields)')
         .top(50)
         .get() as { value?: SpeDriveItem[] };

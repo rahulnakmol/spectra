@@ -28,4 +28,14 @@ describe('tokenBroker', () => {
     await broker.app(['https://graph.microsoft.com/.default']);
     expect(msal.acquireAppToken).toHaveBeenCalledTimes(1);
   });
+
+  it('invalidate removes OBO entries for that session', async () => {
+    const msal = fakeMsal();
+    const broker = createTokenBroker(msal);
+    await broker.obo({ sessionId: 'S1', userAccessToken: 'AT' }, ['Files.ReadWrite.All']);
+    broker.invalidate('S1');
+    // After invalidation, should call MSAL again (cache miss)
+    await broker.obo({ sessionId: 'S1', userAccessToken: 'AT' }, ['Files.ReadWrite.All']);
+    expect(msal.acquireOboToken).toHaveBeenCalledTimes(2);
+  });
 });
