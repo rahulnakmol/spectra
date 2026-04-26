@@ -21,10 +21,19 @@ describe('createContainerProvisioner', () => {
 
   it('POSTs /storage/fileStorage/containers with containerType', async () => {
     nock('https://graph.microsoft.com')
-      .post('/v1.0/storage/fileStorage/containers', (b) => b.containerTypeId === 'CTID' && b.displayName === 'AP')
+      .post('/v1.0/storage/fileStorage/containers', (b) => b.containerTypeId === 'CTID' && b.displayName === 'AP' && b.description === 'Spectra workspace: invoices')
       .reply(201, { id: 'NEW-C', displayName: 'AP' });
     const client = createGraphClient(async () => 'TOK');
     const provision = createContainerProvisioner(client, 'CTID');
     expect(await provision('invoices', 'AP')).toBe('NEW-C');
+  });
+
+  it('throws UpstreamError when response has no id', async () => {
+    nock('https://graph.microsoft.com')
+      .post('/v1.0/storage/fileStorage/containers')
+      .reply(201, { displayName: 'AP' }); // no id field
+    const client = createGraphClient(async () => 'TOK');
+    const provision = createContainerProvisioner(client, 'CTID');
+    await expect(provision('invoices', 'AP')).rejects.toThrow('Container provision returned no id');
   });
 });

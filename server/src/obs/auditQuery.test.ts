@@ -13,6 +13,7 @@ describe('auditQuery', () => {
     const q = createAuditQuery({ logsClient });
     const out = await q({ limit: 10, action: 'files.upload' });
     expect(out.events).toHaveLength(1);
-    expect(logsClient.runQuery).toHaveBeenCalled();
+    expect(logsClient.runQuery).toHaveBeenCalledWith(expect.objectContaining({ kql: expect.stringContaining('files.upload') }));
+    expect(logsClient.runQuery).toHaveBeenCalledWith(expect.objectContaining({ kql: expect.stringContaining('customDimensions.action') }));
   });
 });

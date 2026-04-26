@@ -8,6 +8,10 @@ export interface AuditQueryDeps {
   logsClient: LogsAnalyticsClient | null;
 }
 
+function sanitizeKqlValue(v: string): string {
+  return v.replace(/["\\]/g, '');
+}
+
 export function createAuditQuery(deps: AuditQueryDeps): (q: {
   action?: string; workspace?: string; userOid?: string;
   fromIso?: string; toIso?: string; limit: number;
@@ -15,9 +19,9 @@ export function createAuditQuery(deps: AuditQueryDeps): (q: {
   return async (q) => {
     if (!deps.logsClient) return { events: [] };
     const filters: string[] = [];
-    if (q.action) filters.push(`tostring(customDimensions.action) == "${q.action}"`);
-    if (q.workspace) filters.push(`tostring(customDimensions.workspace) == "${q.workspace}"`);
-    if (q.userOid) filters.push(`tostring(customDimensions.userOid) == "${q.userOid}"`);
+    if (q.action) filters.push(`tostring(customDimensions.action) == "${sanitizeKqlValue(q.action)}"`);
+    if (q.workspace) filters.push(`tostring(customDimensions.workspace) == "${sanitizeKqlValue(q.workspace)}"`);
+    if (q.userOid) filters.push(`tostring(customDimensions.userOid) == "${sanitizeKqlValue(q.userOid)}"`);
     const where = filters.length ? `| where ${filters.join(' and ')}` : '';
     const kql = `customEvents | where name startswith "audit." ${where} | top ${q.limit} by timestamp desc`;
     const events = await deps.logsClient.runQuery({
