@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5, Node.js 20 LTS, Express 4, Zod, `@azure/identity`, `@azure/keyvault-secrets`, `applicationinsights`, Vitest (shared), Jest + Supertest (server).
 
-**Reference:** `docs/superpowers/specs/2026-04-24-spembedded-adminui-design.md` §3, §5, §8, §9, §11, `CLAUDE.md` §3, §5.
+**Reference:** `docs/superpowers/specs/2026-04-24-spectra-design.md` §3, §5, §8, §9, §11, `CLAUDE.md` §3, §5.
 
 **Deliverable at P1 end:**
 - `docker build` + `docker run` produces a working image that:
@@ -50,24 +50,24 @@ touch scripts/.gitkeep
 
 Create `shared/package.json`:
 ```json
-{ "name": "@adminui/shared", "private": true, "version": "0.0.0" }
+{ "name": "@spectra/shared", "private": true, "version": "0.0.0" }
 ```
 
 Create `server/package.json`:
 ```json
-{ "name": "@adminui/server", "private": true, "version": "0.0.0" }
+{ "name": "@spectra/server", "private": true, "version": "0.0.0" }
 ```
 
 Create `web/package.json`:
 ```json
-{ "name": "@adminui/web", "private": true, "version": "0.0.0" }
+{ "name": "@spectra/web", "private": true, "version": "0.0.0" }
 ```
 
 - [ ] **Step 4: Create root `package.json` with npm workspaces**
 
 ```json
 {
-  "name": "spembedded-adminui",
+  "name": "spectra",
   "private": true,
   "version": "0.0.0",
   "engines": { "node": "20.x" },
@@ -76,10 +76,10 @@ Create `web/package.json`:
     "typecheck": "npm -ws --if-present run typecheck",
     "lint": "npm -ws --if-present run lint",
     "test": "npm -ws --if-present run test",
-    "build": "npm -w @adminui/shared --if-present run build && npm -w @adminui/server --if-present run build && npm -w @adminui/web --if-present run build",
-    "dev": "npm -w @adminui/server --if-present run dev",
-    "docker:build": "docker build -t spembedded-adminui:dev .",
-    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spembedded-adminui:dev"
+    "build": "npm -w @spectra/shared --if-present run build && npm -w @spectra/server --if-present run build && npm -w @spectra/web --if-present run build",
+    "dev": "npm -w @spectra/server --if-present run dev",
+    "docker:build": "docker build -t spectra:dev .",
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spectra:dev"
   },
   "devDependencies": {
     "typescript": "5.4.5",
@@ -278,11 +278,11 @@ Thumbs.db
 
 Overwrite `README.md`:
 ```markdown
-# spembedded-adminui
+# spectra
 
 Secure multi-use-case file management over SharePoint Embedded.
 
-See `docs/superpowers/specs/2026-04-24-spembedded-adminui-design.md` for design and `CLAUDE.md` for development workflow.
+See `docs/superpowers/specs/2026-04-24-spectra-design.md` for design and `CLAUDE.md` for development workflow.
 
 ## Quick start
 
@@ -360,7 +360,7 @@ git commit -m "chore: install root dev dependencies"
 
 ```json
 {
-  "name": "@adminui/shared",
+  "name": "@spectra/shared",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -429,7 +429,7 @@ export * from './schemas.js';
 - [ ] **Step 5: Install**
 
 ```bash
-npm install -w @adminui/shared
+npm install -w @spectra/shared
 ```
 
 - [ ] **Step 6: Commit**
@@ -537,7 +537,7 @@ export interface AuditEventPayload {
 - [ ] **Step 2: Typecheck**
 
 ```bash
-npm -w @adminui/shared run typecheck
+npm -w @spectra/shared run typecheck
 ```
 
 Expected: exit 0.
@@ -651,7 +651,7 @@ export type ShareRequest = z.infer<typeof ShareRequestSchema>;
 - [ ] **Step 2: Typecheck**
 
 ```bash
-npm -w @adminui/shared run typecheck
+npm -w @spectra/shared run typecheck
 ```
 
 Expected: exit 0.
@@ -795,7 +795,7 @@ describe('GroupRoleMapEntrySchema', () => {
 - [ ] **Step 2: Run the tests — expect failures until Zod schemas match**
 
 ```bash
-npm -w @adminui/shared run test
+npm -w @spectra/shared run test
 ```
 
 Expected: all tests pass (schemas were written in B3). If any fail, fix the schema or the test.
@@ -824,7 +824,7 @@ git commit -m "test(shared): zod schema validation — env, upload, share, works
 
 ```json
 {
-  "name": "@adminui/server",
+  "name": "@spectra/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -838,7 +838,7 @@ git commit -m "test(shared): zod schema validation — env, upload, share, works
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@adminui/shared": "*",
+    "@spectra/shared": "*",
     "@azure/identity": "4.2.0",
     "@azure/keyvault-secrets": "4.8.0",
     "applicationinsights": "2.9.5",
@@ -965,7 +965,7 @@ describe('loadEnv', () => {
 - [ ] **Step 2: Run the test, expect failure**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=env.test
+npm -w @spectra/server run test -- --testPathPattern=env.test
 ```
 
 Expected: FAIL with "Cannot find module './env'".
@@ -973,7 +973,7 @@ Expected: FAIL with "Cannot find module './env'".
 - [ ] **Step 3: Implement `env.ts`**
 
 ```ts
-import { EnvSchema, type Env } from '@adminui/shared';
+import { EnvSchema, type Env } from '@spectra/shared';
 
 export function loadEnv(source: NodeJS.ProcessEnv | Record<string, unknown> = process.env): Env {
   const result = EnvSchema.safeParse(source);
@@ -990,7 +990,7 @@ export function loadEnv(source: NodeJS.ProcessEnv | Record<string, unknown> = pr
 - [ ] **Step 4: Run tests, expect pass**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=env.test
+npm -w @spectra/server run test -- --testPathPattern=env.test
 ```
 
 Expected: PASS.
@@ -1053,7 +1053,7 @@ describe('loadSecrets', () => {
 - [ ] **Step 2: Run, expect failure**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=secrets.test
+npm -w @spectra/server run test -- --testPathPattern=secrets.test
 ```
 
 - [ ] **Step 3: Implement `secrets.ts`**
@@ -1061,7 +1061,7 @@ npm -w @adminui/server run test -- --testPathPattern=secrets.test
 ```ts
 import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
-import { SecretsSchema, type Secrets } from '@adminui/shared';
+import { SecretsSchema, type Secrets } from '@spectra/shared';
 
 const SECRET_NAMES = {
   aadClientSecret: 'aad-client-secret',
@@ -1088,7 +1088,7 @@ export async function loadSecrets(vaultUri: string): Promise<Secrets> {
 - [ ] **Step 4: Run tests, expect pass**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=secrets.test
+npm -w @spectra/server run test -- --testPathPattern=secrets.test
 ```
 
 - [ ] **Step 5: Commit**
@@ -1148,7 +1148,7 @@ describe('loadAppConfig', () => {
 ```ts
 import { loadEnv } from './env.js';
 import { loadSecrets } from './secrets.js';
-import type { Env, Secrets } from '@adminui/shared';
+import type { Env, Secrets } from '@spectra/shared';
 
 export interface AppConfig {
   env: Env;
@@ -1167,7 +1167,7 @@ export async function loadAppConfig(
 - [ ] **Step 3: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=config/index.test
+npm -w @spectra/server run test -- --testPathPattern=config/index.test
 ```
 
 Expected: PASS.
@@ -1302,7 +1302,7 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, _next) => {
 - [ ] **Step 4: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=errors
+npm -w @spectra/server run test -- --testPathPattern=errors
 ```
 
 Expected: PASS.
@@ -1403,7 +1403,7 @@ export function securityHeaders(): RequestHandler[] {
 - [ ] **Step 3: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=middleware/security
+npm -w @spectra/server run test -- --testPathPattern=middleware/security
 ```
 
 Expected: PASS.
@@ -1498,7 +1498,7 @@ export function rateLimit(opts: RateLimitOptions): RequestHandler {
 - [ ] **Step 3: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=rateLimit
+npm -w @spectra/server run test -- --testPathPattern=rateLimit
 ```
 
 Expected: PASS.
@@ -1634,7 +1634,7 @@ export function hashIp(ip: string, salt: string): string {
 - [ ] **Step 4: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=obs
+npm -w @spectra/server run test -- --testPathPattern=obs
 ```
 
 Expected: PASS.
@@ -1722,7 +1722,7 @@ export function healthRouter(opts: HealthRouterOptions): ExpressRouter {
 - [ ] **Step 3: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=routes/health
+npm -w @spectra/server run test -- --testPathPattern=routes/health
 ```
 
 Expected: PASS.
@@ -1794,7 +1794,7 @@ export function makeKeyVaultProbe(vaultUri: string): () => Promise<void> {
 - [ ] **Step 3: Run tests**
 
 ```bash
-npm -w @adminui/server run test -- --testPathPattern=probes/keyVault
+npm -w @spectra/server run test -- --testPathPattern=probes/keyVault
 ```
 
 Expected: PASS.
@@ -1875,8 +1875,8 @@ main().catch((err) => {
 - [ ] **Step 2: Typecheck + build**
 
 ```bash
-npm -w @adminui/server run typecheck
-npm -w @adminui/server run build
+npm -w @spectra/server run typecheck
+npm -w @spectra/server run build
 ```
 
 Expected: both exit 0.
@@ -2026,7 +2026,7 @@ describe('createApp integration', () => {
 - [ ] **Step 4: Run tests**
 
 ```bash
-npm -w @adminui/server run test
+npm -w @spectra/server run test
 ```
 
 Expected: all server tests pass.
@@ -2085,8 +2085,8 @@ FROM deps AS build
 COPY tsconfig.base.json ./
 COPY shared ./shared
 COPY server ./server
-RUN npm -w @adminui/shared run build \
- && npm -w @adminui/server run build
+RUN npm -w @spectra/shared run build \
+ && npm -w @spectra/server run build
 
 # ---- runtime ------------------------------------------------------
 FROM node:20.14.0-alpine AS runtime
@@ -2124,7 +2124,7 @@ git commit -m "build: multi-stage dockerfile for server (web stage added in p3)"
 - [ ] **Step 1: Build the image**
 
 ```bash
-docker build -t spembedded-adminui:dev .
+docker build -t spectra:dev .
 ```
 
 Expected: build completes successfully.
@@ -2143,7 +2143,7 @@ docker run --rm -d --name adminui-smoke -p 3000:3000 \
   -e SHAREPOINT_HOSTNAME=contoso.sharepoint.com \
   -e APP_BASE_URL=https://app.local \
   -e APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=stub" \
-  spembedded-adminui:dev
+  spectra:dev
 sleep 2
 curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:3000/health
 docker logs adminui-smoke --tail 20
@@ -2228,11 +2228,11 @@ jobs:
           context: .
           push: false
           load: true
-          tags: spembedded-adminui:ci
+          tags: spectra:ci
       - name: Trivy scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: spembedded-adminui:ci
+          image-ref: spectra:ci
           format: table
           exit-code: '1'
           severity: HIGH,CRITICAL
@@ -2335,7 +2335,7 @@ git commit -m "docs(plan): mark p1 completed"
 ## Exit criteria (P1 done when all are true)
 
 - [ ] `npm ci && npm run typecheck && npm run lint && npm run test && npm run build` all pass from a fresh clone.
-- [ ] `docker build -t spembedded-adminui:dev .` succeeds.
+- [ ] `docker build -t spectra:dev .` succeeds.
 - [ ] `docker run` with the env vars from Task D2 yields `GET /health` 200 within 5s.
 - [ ] `GET /ready` returns 503 when KV is unreachable and 200 otherwise.
 - [ ] CI workflow is green on a PR or push.

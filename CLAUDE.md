@@ -2,7 +2,7 @@
 
 Guidance for Claude Code when working in this repository.
 
-> Read this file fully on first entry. The design spec lives at `docs/superpowers/specs/2026-04-24-spembedded-adminui-design.md` — treat it as the source of truth for what we're building. This file describes *how* to build it.
+> Read this file fully on first entry. The design spec lives at `docs/superpowers/specs/2026-04-24-spectra-design.md` — treat it as the source of truth for what we're building. This file describes *how* to build it.
 
 ---
 
@@ -10,7 +10,7 @@ Guidance for Claude Code when working in this repository.
 
 A Fluent UI + React SPA + Node/TypeScript BFF that provides a SharePoint-like experience over SharePoint Embedded (SPE) containers. Initial use case: Accounts Payable invoice management. Designed to support additional workspaces without code changes. Single-tenant Entra ID SSO, OBO-mediated Graph calls, internal-only no-download sharing.
 
-See `docs/superpowers/specs/2026-04-24-spembedded-adminui-design.md` for full decisions.
+See `docs/superpowers/specs/2026-04-24-spectra-design.md` for full decisions.
 
 ## 2. Tech stack
 
