@@ -15,6 +15,9 @@ async function main(): Promise<void> {
   // no such routes are mounted, so a KV failure is logged but not fatal —
   // the server still starts and /health returns 200. /ready will return 503
   // via the KV probe until the vault is reachable.
+  // TODO(P2): when auth/session routes are mounted, capture the resolved
+  // Secrets object here and gate those routes on secrets != null; this
+  // .catch must re-throw (or the route mount must assert secrets loaded).
   await loadSecrets(env.AZURE_KEY_VAULT_URI).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.error('Secrets unavailable at startup (non-fatal at P1):', err instanceof Error ? err.message : String(err));
