@@ -1,0 +1,15 @@
+.git
+.github
+docs
+web/**
+!web/package.json
+infra
+scripts
+.superpowers
+**/node_modules
+**/dist
+**/coverage
+**/.env*
+!.env.example
+**/*.test.ts
+**/*.spec.ts
