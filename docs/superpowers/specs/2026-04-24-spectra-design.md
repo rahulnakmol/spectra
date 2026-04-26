@@ -1,4 +1,4 @@
-# spembedded-adminui — Design Spec
+# Spectra — Design Spec
 
 **Status:** draft — pending user review
 **Date:** 2026-04-24
