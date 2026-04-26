@@ -32,4 +32,30 @@ describe('mapGraphErrorToDomain', () => {
     const e = mapGraphErrorToDomain({ statusCode: undefined, message: 'unknown' });
     expect(e).toBeInstanceOf(UpstreamError);
   });
+
+  it('maps 429 to UpstreamError with retry-after from Headers object (.get method)', () => {
+    const headers = { get: (name: string) => name === 'retry-after' ? '45' : null };
+    const e = mapGraphErrorToDomain({ statusCode: 429, message: 'throttled', headers });
+    expect(e).toBeInstanceOf(UpstreamError);
+    expect((e as UpstreamError).detail?.retryAfterSec).toBe(45);
+  });
+
+  it('maps 429 with no retry-after header to UpstreamError without retryAfterSec', () => {
+    const e = mapGraphErrorToDomain({ statusCode: 429, message: 'throttled', headers: undefined });
+    expect(e).toBeInstanceOf(UpstreamError);
+    expect((e as UpstreamError).detail?.retryAfterSec).toBeUndefined();
+  });
+
+  it('maps 429 with non-numeric retry-after to UpstreamError without retryAfterSec', () => {
+    const e = mapGraphErrorToDomain({ statusCode: 429, message: 'throttled', headers: { 'retry-after': 'soon' } });
+    expect(e).toBeInstanceOf(UpstreamError);
+    expect((e as UpstreamError).detail?.retryAfterSec).toBeUndefined();
+  });
+
+  it('maps 429 with Headers .get returning null to UpstreamError without retryAfterSec', () => {
+    const headers = { get: (_name: string) => null };
+    const e = mapGraphErrorToDomain({ statusCode: 429, message: 'throttled', headers });
+    expect(e).toBeInstanceOf(UpstreamError);
+    expect((e as UpstreamError).detail?.retryAfterSec).toBeUndefined();
+  });
 });

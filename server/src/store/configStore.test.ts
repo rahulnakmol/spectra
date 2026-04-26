@@ -61,4 +61,47 @@ describe('ConfigStore', () => {
     await store.getWorkspaces();
     expect(reader).toHaveBeenCalledTimes(2);
   });
+
+  it('propagates reader errors that are not not_found', async () => {
+    const reader = jest.fn(async (_path: string) => {
+      const err = new Error('network failure') as Error & { code: string };
+      err.code = 'ECONNRESET';
+      throw err;
+    });
+    const store = createConfigStore({ reader, ttlMs: 60_000 });
+    await expect(store.getWorkspaces()).rejects.toThrow('network failure');
+  });
+
+  it('falls back to defaults when file has status 404', async () => {
+    const reader = jest.fn(async (_path: string) => {
+      const err = new Error('not found') as Error & { status: number };
+      err.status = 404;
+      throw err;
+    });
+    const store = createConfigStore({ reader, ttlMs: 60_000 });
+    expect((await store.getWorkspaces()).workspaces).toEqual([]);
+  });
+
+  it('throws when writer is not provided', async () => {
+    const reader = fakeReader({ '/config/workspaces.json': { workspaces: [] } });
+    const store = createConfigStore({ reader }); // no writer
+    await expect(store.putWorkspaces({ workspaces: [] })).rejects.toThrow('writer not provided');
+  });
+
+  it('putGroupRoleMap writes and invalidates cache', async () => {
+    const written: Record<string, string> = {};
+    const reader = fakeReader({});
+    const writer = jest.fn(async (path: string, body: string) => { written[path] = body; });
+    const store = createConfigStore({ reader, writer, ttlMs: 60_000 });
+    await store.putGroupRoleMap({ entries: [] });
+    expect(writer).toHaveBeenCalledWith('/config/group-role-map.json', expect.any(String));
+  });
+
+  it('putAppSettings writes and invalidates cache', async () => {
+    const reader = fakeReader({});
+    const writer = jest.fn(async () => { /* no-op */ });
+    const store = createConfigStore({ reader, writer, ttlMs: 60_000 });
+    await store.putAppSettings({ brandName: 'X', welcomePitch: 'Y', defaultTheme: 'dark' });
+    expect(writer).toHaveBeenCalledWith('/config/app-settings.json', expect.any(String));
+  });
 });

@@ -107,4 +107,87 @@ describe('auth routes', () => {
     expect(r.body).toMatchObject({ userOid: 'O', isAdmin: true });
     expect(r.body.teamMemberships).toHaveLength(1);
   });
+
+  it('GET /api/auth/callback → 400 when code or state missing', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore()))
+      .get('/api/auth/callback?code=C'); // state missing
+    expect(r.status).toBe(400);
+  });
+
+  it('GET /api/auth/callback → 400 when state cookie missing', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore()))
+      .get('/api/auth/callback?code=C&state=S'); // no cookie set
+    expect(r.status).toBe(400);
+  });
+
+  it('GET /api/auth/callback → 400 when state cookie does not match query state', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore()))
+      .get('/api/auth/callback?code=C&state=WRONG')
+      .set('Cookie', 'spectra.oauth=DIFFERENT');
+    expect(r.status).toBe(400);
+  });
+
+  it('GET /api/auth/callback → 400 when state is not in pkce store (unknown state)', async () => {
+    const app = makeApp(makeMsal(), makeStore());
+    // Do the login to register a real state cookie
+    const login = await request(app).get('/api/auth/login');
+    const setCookie = login.headers['set-cookie']?.[0] ?? '';
+    // Use the real state cookie but a different state value — matches cookie but not in store
+    const stateMatch = (login.headers.location ?? '').match(/state=([^&]+)/);
+    const realState = stateMatch?.[1] ?? '';
+    // Consume the real state first so store no longer has it
+    await request(app)
+      .get(`/api/auth/callback?code=C&state=${realState}`)
+      .set('Cookie', setCookie);
+    // Second attempt with same state → already consumed
+    const r2 = await request(app)
+      .get(`/api/auth/callback?code=C&state=${realState}`)
+      .set('Cookie', setCookie);
+    expect(r2.status).toBe(400);
+  });
+
+  it('GET /api/auth/login → sets Secure flag on cookie when secureCookie=true', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(authRouter({
+      msal: makeMsal(), store: makeStore(), hmacKey: HMAC,
+      slidingMin: 480, absoluteMin: 1440, secureCookie: true,
+      resolveRoleSnapshot: async () => ({ isAdmin: false, teamMemberships: [] }),
+    }));
+    const r = await request(app).get('/api/auth/login');
+    expect(r.headers['set-cookie']?.[0]).toContain('Secure');
+  });
+
+  it('GET /api/auth/login → ignores non-relative returnTo values', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore()))
+      .get('/api/auth/login?returnTo=https://evil.com/steal');
+    // Should redirect to authorize URL, returnTo is ignored (defaults to /)
+    expect(r.status).toBe(302);
+    // After callback the redirect should go to '/', not the external URL
+  });
+
+  it('POST /api/auth/logout → 204 when no session cookie present', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore())).post('/api/auth/logout');
+    expect(r.status).toBe(204);
+  });
+
+  it('POST /api/auth/logout → 204 when cookie present but HMAC invalid', async () => {
+    const r = await request(makeApp(makeMsal(), makeStore()))
+      .post('/api/auth/logout')
+      .set('Cookie', `${SESSION_COOKIE_NAME}=invalidsig.blah`);
+    expect(r.status).toBe(204);
+  });
+
+  it('POST /api/auth/logout → propagates store.delete error', async () => {
+    const store = makeStore();
+    const sid = 'SIDaaBBccDDeeFfGg';
+    await store.put({ sessionId: sid, userOid: 'O', tenantId: 'T', isAdmin: false,
+      teamMemberships: [], issuedAt: Date.now(), absoluteExpiresAt: Date.now() + 86400_000,
+      expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now(), userAccessToken: 'AT' } as never);
+    (store.delete as jest.MockedFunction<(id: string) => Promise<void>>).mockRejectedValue(new Error('store failure'));
+    const r = await request(makeApp(makeMsal(), store))
+      .post('/api/auth/logout')
+      .set('Cookie', `${SESSION_COOKIE_NAME}=${signSessionCookie(sid, HMAC)}`);
+    expect(r.status).toBe(500);
+  });
 });

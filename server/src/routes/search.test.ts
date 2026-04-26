@@ -72,4 +72,38 @@ describe('search route', () => {
     const r = await request(makeApp()).get('/api/search?ws=invoices&q=a');
     expect(r.status).toBe(400);
   });
+
+  it('returns 403 when user has no membership in requested workspace', async () => {
+    const r = await request(makeApp()).get('/api/search?ws=other-workspace&q=invoice');
+    expect(r.status).toBe(403);
+  });
+
+  it('returns 400 when ws param is missing', async () => {
+    const r = await request(makeApp()).get('/api/search?q=invoice');
+    expect(r.status).toBe(400);
+  });
+
+  it('admin sees results from all uploaders', async () => {
+    const admin: SessionClaims = { ...member, isAdmin: true, teamMemberships: [] };
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/drives/D1/root/search(q=%27invoice%27)')
+      .query(true)
+      .reply(200, { value: [
+        { id: 'A', name: 'invoice-1.pdf', size: 1, createdBy: { user: { id: 'U-MEM' } }, createdDateTime: '2026-01-01T00:00:00Z', listItem: { fields: { UploadedByOid: 'U-MEM' } } },
+        { id: 'B', name: 'invoice-2.pdf', size: 1, createdBy: { user: { id: 'OTHER' } }, createdDateTime: '2026-01-01T00:00:00Z', listItem: { fields: { UploadedByOid: 'OTHER' } } },
+      ] });
+    const r = await request(makeApp(admin)).get('/api/search?ws=invoices&q=invoice');
+    expect(r.status).toBe(200);
+    expect(r.body.items).toHaveLength(2);
+  });
+
+  it('handles empty value array from Graph', async () => {
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/drives/D1/root/search(q=%27invoice%27)')
+      .query(true)
+      .reply(200, {}); // no value property
+    const r = await request(makeApp()).get('/api/search?ws=invoices&q=invoice');
+    expect(r.status).toBe(200);
+    expect(r.body.items).toHaveLength(0);
+  });
 });

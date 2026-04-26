@@ -21,4 +21,20 @@ describe('getPreviewUrl', () => {
     const url = await getPreviewUrl(client, 'D', 'I');
     expect(url).toBe('https://contoso.sharepoint.com/embed/xyz');
   });
+
+  it('throws when Graph /preview returns no getUrl', async () => {
+    nock('https://graph.microsoft.com')
+      .post('/v1.0/drives/D/items/I/preview')
+      .reply(200, { postUrl: 'https://something.else' }); // no getUrl
+    const client = createGraphClient(async () => 't');
+    await expect(getPreviewUrl(client, 'D', 'I')).rejects.toThrow('Graph /preview returned no getUrl');
+  });
+
+  it('throws when Graph /preview returns null getUrl', async () => {
+    nock('https://graph.microsoft.com')
+      .post('/v1.0/drives/D/items/I/preview')
+      .reply(200, { getUrl: null });
+    const client = createGraphClient(async () => 't');
+    await expect(getPreviewUrl(client, 'D', 'I')).rejects.toThrow('Graph /preview returned no getUrl');
+  });
 });

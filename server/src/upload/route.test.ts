@@ -41,13 +41,35 @@ const member: SessionClaims = {
   userAccessToken: 'AT',
 };
 
-function makeApp(session: SessionClaims = member) {
+function makeApp(session: SessionClaims = member, store?: ConfigStore) {
   const app = express();
   app.use((req, _r, n) => { (req as unknown as { session: SessionClaims }).session = session; n(); });
   const graph = createGraphClient(async () => 'TOK');
-  app.use(uploadRouter({ store: makeStore(), graphForUser: () => graph, graphAppOnly: () => graph }));
+  app.use(uploadRouter({ store: store ?? makeStore(), graphForUser: () => graph, graphAppOnly: () => graph }));
   app.use(errorMiddleware);
   return app;
+}
+
+function makeStoreWithExtraFields(extra: Array<{ name: string; type: string; required: boolean; indexed: boolean; enumValues?: string[] }>): ConfigStore {
+  return {
+    getWorkspaces: jest.fn(async () => ({
+      workspaces: [{
+        id: 'invoices', displayName: 'Invoices', template: 'invoices', containerId: 'D1',
+        folderConvention: ['Team', 'YYYY', 'MM'],
+        metadataSchema: [
+          { name: 'Vendor', type: 'string', required: true, indexed: true },
+          { name: 'InvoiceNumber', type: 'string', required: true, indexed: true },
+          { name: 'Amount', type: 'number', required: true, indexed: false },
+          { name: 'Currency', type: 'string', required: true, indexed: false },
+          ...extra,
+        ],
+        archived: false, createdAt: '2026-01-01T00:00:00Z',
+        createdByOid: '00000000-0000-0000-0000-000000000000',
+      }],
+    })),
+    getGroupRoleMap: jest.fn(), getAppSettings: jest.fn(),
+    putWorkspaces: jest.fn(), putGroupRoleMap: jest.fn(), putAppSettings: jest.fn(), invalidate: jest.fn(),
+  } as unknown as ConfigStore;
 }
 
 describe('upload route', () => {
@@ -127,6 +149,85 @@ describe('upload route', () => {
       .field('workspaceId', 'invoices').field('teamCode', 'AP')
       .field('year', '2026').field('month', '4')
       .field('metadata', JSON.stringify({ Vendor: 'V' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata with wrong field type (string field given number)', async () => {
+    const r = await request(makeApp())
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 123, InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata with wrong field type (number field given string)', async () => {
+    const r = await request(makeApp())
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 'not-a-number', Currency: 'USD' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata that is not valid JSON', async () => {
+    const r = await request(makeApp())
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', '{not-valid-json')
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects upload when UploadRequest schema validation fails (missing workspaceId)', async () => {
+    const r = await request(makeApp())
+      .post('/api/upload')
+      .field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata with invalid date field', async () => {
+    const store = makeStoreWithExtraFields([
+      { name: 'InvoiceDate', type: 'date', required: true, indexed: false },
+    ]);
+    const r = await request(makeApp(member, store))
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD', InvoiceDate: 'not-a-date' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata with enum field not in allowed values', async () => {
+    const store = makeStoreWithExtraFields([
+      { name: 'Category', type: 'enum', required: true, indexed: false, enumValues: ['A', 'B'] },
+    ]);
+    const r = await request(makeApp(member, store))
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD', Category: 'C' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects metadata with enum field given a non-string value', async () => {
+    const store = makeStoreWithExtraFields([
+      { name: 'Category', type: 'enum', required: true, indexed: false, enumValues: ['A', 'B'] },
+    ]);
+    const r = await request(makeApp(member, store))
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD', Category: 42 }))
       .attach('file', PDF, 'invoice.pdf');
     expect(r.status).toBe(400);
   });
