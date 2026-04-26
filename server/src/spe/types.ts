@@ -4,7 +4,8 @@ export interface GraphLikeError {
   statusCode?: number | undefined;
   message?: string | undefined;
   code?: string | undefined;
-  headers?: Record<string, string> | undefined;
+  // May be a plain Record or a fetch Headers object (which has a .get() method)
+  headers?: Record<string, string> | { get(name: string): string | null } | undefined;
 }
 
 export interface GraphTokenAcquirer {
@@ -34,7 +35,10 @@ export function mapGraphErrorToDomain(err: GraphLikeError): DomainError {
   if (status === 409) return new ConflictError('Conflict', { upstream: msg });
   if (status === 400) return new BadRequestError('Bad request', { upstream: msg });
   if (status === 429) {
-    const ra = err.headers?.['retry-after'];
+    const h = err.headers;
+    const ra = h === null || h === undefined ? undefined : typeof (h as { get?: unknown }).get === 'function'
+      ? (h as { get(name: string): string | null }).get('retry-after') ?? undefined
+      : (h as Record<string, string>)['retry-after'];
     const retryAfterSec = ra ? Number.parseInt(ra, 10) : undefined;
     return new UpstreamError('Upstream throttled', {
       upstream: msg,
