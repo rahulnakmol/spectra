@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ---- deps ---------------------------------------------------------
-FROM node:20.14.0-alpine AS deps
+FROM node:20-alpine3.21 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
@@ -17,17 +17,18 @@ RUN npm -w @spectra/shared run build \
  && npm -w @spectra/server run build
 
 # ---- runtime ------------------------------------------------------
-FROM node:20.14.0-alpine AS runtime
+FROM node:20-alpine3.21 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup -S app && adduser -S app -G app
+RUN apk upgrade --no-cache && addgroup -S app && adduser -S app -G app
 
 # Prune devDependencies
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY server/package.json server/
 COPY web/package.json web/
-RUN npm ci --workspaces --include-workspace-root --omit=dev
+RUN npm ci --workspaces --include-workspace-root --omit=dev \
+ && npm uninstall -g npm
 
 # Copy built artifacts
 COPY --from=build /app/shared/dist ./shared/dist
