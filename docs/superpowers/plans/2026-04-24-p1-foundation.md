@@ -1,5 +1,7 @@
 # P1 — Foundation Implementation Plan
 
+**Status:** completed 2026-04-26
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up the monorepo, shared types package, BFF scaffold (config + security + health + logging), Docker image, and CI pipeline — so subsequent plans can add features against a stable, testable foundation.
