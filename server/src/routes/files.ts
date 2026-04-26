@@ -1,4 +1,5 @@
 import { Router, type Request, type RequestHandler } from 'express';
+import { z } from 'zod';
 import { ListFilesQuerySchema } from '@spectra/shared';
 import type { FileItem } from '@spectra/shared';
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthenticatedError } from '../errors/domain.js';
@@ -9,6 +10,8 @@ import { getPreviewUrl } from '../spe/preview.js';
 import type { SpeGraphClient, SpeDriveItem } from '../spe/index.js';
 import type { ConfigStore } from '../store/configStore.js';
 import { resolveWorkspaceContext } from './workspaceContext.js';
+
+const WsQuerySchema = z.object({ ws: z.string().min(1) });
 
 export interface FilesRouterDeps {
   store: ConfigStore;
@@ -71,8 +74,9 @@ export function filesRouter(deps: FilesRouterDeps): Router {
   const getOne: RequestHandler = async (req, res, next) => {
     try {
       if (!req.session) throw new UnauthenticatedError();
-      const ws = typeof req.query['ws'] === 'string' ? req.query['ws'] : '';
-      if (!ws) throw new BadRequestError('Missing ws');
+      const wsResult = WsQuerySchema.safeParse(req.query);
+      if (!wsResult.success) throw new BadRequestError('Missing or invalid ws');
+      const ws = wsResult.data.ws;
       const { driveId } = await resolveWorkspaceContext(deps.store, ws);
       const item = await getItem(deps.graphForUser(req), driveId, req.params['id'] ?? '');
       const fileItem = toFileItem(item);
@@ -92,8 +96,9 @@ export function filesRouter(deps: FilesRouterDeps): Router {
   const preview: RequestHandler = async (req, res, next) => {
     try {
       if (!req.session) throw new UnauthenticatedError();
-      const ws = typeof req.query['ws'] === 'string' ? req.query['ws'] : '';
-      if (!ws) throw new BadRequestError('Missing ws');
+      const wsResult = WsQuerySchema.safeParse(req.query);
+      if (!wsResult.success) throw new BadRequestError('Missing or invalid ws');
+      const ws = wsResult.data.ws;
       const { driveId } = await resolveWorkspaceContext(deps.store, ws);
       const item = await getItem(deps.graphForUser(req), driveId, req.params['id'] ?? '');
       const fileItem = toFileItem(item);
