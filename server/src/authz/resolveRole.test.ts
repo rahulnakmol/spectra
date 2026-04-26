@@ -54,4 +54,15 @@ describe('resolveRoleSnapshot', () => {
     const out = await resolveRoleSnapshot(claims, 'AT', { store, fetchGroupsOverage: jest.fn<() => Promise<string[]>>() });
     expect(out.teamMemberships).toHaveLength(0);
   });
+
+  it('deduplicates when two groups map to the same workspace+team', async () => {
+    const groupId2 = '22222222-2222-2222-2222-222222222222';
+    const store = makeStore([
+      { entraGroupId: groupId, entraGroupDisplayName: 'Finance', workspaceId: 'invoices', teamCode: 'AP', teamDisplayName: 'AP Team' },
+      { entraGroupId: groupId2, entraGroupDisplayName: 'Finance-Sub', workspaceId: 'invoices', teamCode: 'AP', teamDisplayName: 'AP Team' },
+    ]);
+    const claims: IdTokenClaims = { oid: 'O', tid: 'T', preferred_username: 'u', name: 'n', groups: [groupId, groupId2] };
+    const out = await resolveRoleSnapshot(claims, 'AT', { store, fetchGroupsOverage: jest.fn<() => Promise<string[]>>() });
+    expect(out.teamMemberships).toHaveLength(1);
+  });
 });

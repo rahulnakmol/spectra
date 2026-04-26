@@ -17,8 +17,9 @@ export async function resolveRoleSnapshot(
   const map = await deps.store.getGroupRoleMap();
   const teamMemberships: TeamMembership[] = [];
   const seen = new Set<string>();
+  const groupIdSet = new Set(groupIds);
   for (const entry of map.entries) {
-    if (!groupIds.includes(entry.entraGroupId)) continue;
+    if (!groupIdSet.has(entry.entraGroupId)) continue;
     const key = `${entry.workspaceId}:${entry.teamCode}`;
     if (seen.has(key)) continue;
     seen.add(key);
