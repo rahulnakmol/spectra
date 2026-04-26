@@ -25,6 +25,7 @@ const claims: SessionClaims = {
   sessionId: 'S1aBcDeFgHiJkLmN', userOid: 'U1', tenantId: 'T1', isAdmin: false,
   teamMemberships: [], issuedAt: 1, absoluteExpiresAt: 9_999_999_999_999,
   expiresAt: 9_999_999_999_999, lastSlidingUpdate: 1,
+  userAccessToken: 'AT',
 };
 
 describe('SessionStore', () => {

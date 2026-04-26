@@ -22,6 +22,7 @@ const baseClaims: SessionClaims = {
   sessionId: 'SIDaaBBccDDeeFfGg', userOid: 'OID', tenantId: 'TID', isAdmin: false,
   teamMemberships: [], issuedAt: Date.now(), absoluteExpiresAt: Date.now() + 86400_000,
   expiresAt: Date.now() + 3600_000, lastSlidingUpdate: Date.now(),
+  userAccessToken: 'AT',
 };
 
 function makeApp(store: SessionStore) {

@@ -38,6 +38,7 @@ const member: SessionClaims = {
   sessionId: 'S', userOid: '00000000-0000-0000-0000-000000000010', tenantId: 'T', isAdmin: false,
   teamMemberships: [{ workspaceId: 'invoices', teamCode: 'AP', teamDisplayName: 'AP Team' }],
   issuedAt: 0, expiresAt: 9_999_999_999_999, absoluteExpiresAt: 9_999_999_999_999, lastSlidingUpdate: 0,
+  userAccessToken: 'AT',
 };
 
 function makeApp(session: SessionClaims = member) {

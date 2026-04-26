@@ -73,6 +73,7 @@ export interface SessionClaims {
   absoluteExpiresAt: number; // set once at login, never changed — used as absolute upper bound for sliding TTL
   expiresAt: number;
   lastSlidingUpdate: number;
+  userAccessToken: string;
 }
 
 export interface AuditEventPayload {

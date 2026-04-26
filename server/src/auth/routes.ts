@@ -62,6 +62,7 @@ export function authRouter(deps: AuthRouterDeps): Router {
         absoluteExpiresAt: now + absoluteMs,
         expiresAt: now + slidingMs,
         lastSlidingUpdate: now,
+        userAccessToken: tokens.accessToken,
       });
       const signed = signSessionCookie(sessionId, deps.hmacKey);
       res.setHeader('Set-Cookie', [

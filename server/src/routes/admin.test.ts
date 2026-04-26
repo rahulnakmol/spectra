@@ -9,7 +9,7 @@ import type { ConfigStore } from '../store/configStore.js';
 const admin: SessionClaims = {
   sessionId: 'S', userOid: '00000000-0000-0000-0000-000000000010', tenantId: 'T', isAdmin: true,
   teamMemberships: [], issuedAt: 0, expiresAt: 9_999_999_999_999, lastSlidingUpdate: 0,
-  absoluteExpiresAt: 9_999_999_999_999,
+  absoluteExpiresAt: 9_999_999_999_999, userAccessToken: 'AT',
 };
 const member: SessionClaims = { ...admin, isAdmin: false };
 
