@@ -133,6 +133,20 @@ describe('share route', () => {
     expect(r.status).toBe(401);
   });
 
+  it('returns 200 even when sendMail returns 403 (best-effort mail)', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/drives/D1/items/IT').query(true).reply(200, { id: 'IT', name: 'a.pdf', createdBy: { user: { id: 'U-MEM' } }, listItem: { fields: { UploadedByOid: 'U-MEM' } } })
+      .get('/v1.0/users/alice%40contoso.com').query(true).reply(200, { id: 'OID-A' })
+      .post('/v1.0/drives/D1/items/IT/createLink').reply(200, { link: { webUrl: 'https://share/x' }, id: 'PERM' })
+      .post('/v1.0/users/U-MEM/sendMail').reply(403, { error: { code: 'ErrorAccessDenied', message: 'Access denied' } });
+    const r = await request(makeApp())
+      .post('/api/files/IT/share')
+      .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
+    expect(r.status).toBe(200);
+    expect(r.body.shareUrl).toBe('https://share/x');
+  });
+
   it('rejects share when user does not own the file (only-own)', async () => {
     const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
     nock('https://graph.microsoft.com')

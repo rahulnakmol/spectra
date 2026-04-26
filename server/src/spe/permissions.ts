@@ -1,4 +1,5 @@
 import type { SpeGraphClient } from './client.js';
+import { UpstreamError } from '../errors/domain.js';
 
 export interface SharingLinkResult {
   webUrl: string;
@@ -19,10 +20,12 @@ export async function createSharingLink(
     expirationDateTime: opts.expiresAt,
     retainInheritedPermissions: true,
   }) as { link?: { webUrl?: string }; id?: string; expirationDateTime?: string };
-  const result: SharingLinkResult = {
-    webUrl: resp.link?.webUrl as string,
-    permissionId: resp.id as string,
-  };
+  const webUrl = resp.link?.webUrl;
+  const permissionId = resp.id;
+  if (typeof webUrl !== 'string' || typeof permissionId !== 'string') {
+    throw new UpstreamError('createSharingLink response missing link.webUrl or id');
+  }
+  const result: SharingLinkResult = { webUrl, permissionId };
   if (resp.expirationDateTime !== undefined) {
     result.expirationDateTime = resp.expirationDateTime;
   }

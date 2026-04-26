@@ -34,17 +34,20 @@ export function sharingRouter(deps: SharingRouterDeps): Router {
       if (!Number.isFinite(expiresAt) || expiresAt <= now) throw new BadRequestError('expiresAt must be in the future');
       if (expiresAt - now > MAX_DAYS * 86_400_000) throw new BadRequestError(`expiresAt must be within ${MAX_DAYS} days`);
 
+      const fileId = req.params['id'];
+      if (!fileId) throw new BadRequestError('Missing file id');
+
       const { driveId } = await resolveWorkspaceContext(deps.store, body.ws);
       const client = deps.graphForUser(req);
 
-      const recipients = await resolveRecipients(client, body.recipientUpns);
-
-      const item = await getItem(client, driveId, req.params['id'] ?? '');
+      const item = await getItem(client, driveId, fileId);
       const fields = (item.listItem?.fields ?? {}) as Record<string, unknown>;
       const ownerOid = typeof fields['UploadedByOid'] === 'string' ? fields['UploadedByOid'] : undefined;
       if (!req.session.isAdmin && ownerOid !== req.session.userOid) {
         throw new ForbiddenError('You can only share files you uploaded');
       }
+
+      const recipients = await resolveRecipients(client, body.recipientUpns);
 
       const link = await createSharingLink(client, driveId, item.id, { expiresAt: body.expiresAt });
 
@@ -54,18 +57,31 @@ export function sharingRouter(deps: SharingRouterDeps): Router {
         detail: { recipientCount: recipients.length, expiresAt: body.expiresAt },
       });
 
+      res.json({ shareUrl: link.webUrl, expiresAt: body.expiresAt });
+
+      // Best-effort mail — failure does not affect the response already sent
       const recipientList = recipients.map((rec) => ({ emailAddress: { address: rec.upn } }));
       const message = body.message ?? '';
-      await client.api(`/users/${req.session.userOid}/sendMail`).post({
+      const userOid = req.session.userOid;
+      const ws = body.ws;
+      const resourceId = item.id;
+      client.api(`/users/${userOid}/sendMail`).post({
         message: {
           subject: `A file has been shared with you`,
           body: { contentType: 'Text', content: `${message}\n\nView: ${link.webUrl}\nExpires: ${body.expiresAt}` },
           toRecipients: recipientList,
         },
         saveToSentItems: false,
+      }).catch((mailErr: unknown) => {
+        audit({
+          userOid,
+          action: 'files.share.notify',
+          workspace: ws,
+          resourceId,
+          outcome: 'failure',
+          detail: { error: mailErr instanceof Error ? mailErr.message : String(mailErr) },
+        });
       });
-
-      res.json({ shareUrl: link.webUrl, expiresAt: body.expiresAt });
     } catch (rawErr) {
       const err = (rawErr !== null && typeof rawErr === 'object' && 'statusCode' in rawErr)
         ? mapGraphErrorToDomain(rawErr as GraphLikeError)
