@@ -82,6 +82,30 @@ async function main(): Promise<void> {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+
+  process.on('unhandledRejection', (reason) => {
+    audit({
+      userOid: 'system',
+      action: 'server.unhandled_rejection',
+      outcome: 'failure',
+      detail: { message: reason instanceof Error ? reason.message : String(reason) },
+    });
+    // eslint-disable-next-line no-console
+    console.error('Unhandled rejection:', reason);
+    process.exit(1);
+  });
+
+  process.on('uncaughtException', (err) => {
+    audit({
+      userOid: 'system',
+      action: 'server.uncaught_exception',
+      outcome: 'failure',
+      detail: { message: err.message },
+    });
+    // eslint-disable-next-line no-console
+    console.error('Uncaught exception:', err);
+    process.exit(1);
+  });
 }
 
 main().catch((err) => {

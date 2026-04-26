@@ -3,10 +3,6 @@ import type { RequestHandler } from 'express';
 
 export function securityHeaders(): RequestHandler[] {
   return [
-    (_req, res, next) => {
-      res.removeHeader('X-Powered-By');
-      next();
-    },
     helmet({
       contentSecurityPolicy: {
         useDefaults: false,

@@ -8,9 +8,22 @@ export interface RateLimitOptions {
 
 interface Bucket { tokens: number; lastRefill: number; }
 
+const EVICTION_INTERVAL_MS = 60_000;
+
 export function rateLimit(opts: RateLimitOptions): RequestHandler {
   const buckets = new Map<string, Bucket>();
   const keyFn = opts.keyFn ?? ((req) => req.ip ?? 'unknown');
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of buckets) {
+      // Bucket is fully refilled and idle — safe to evict
+      const idleMs = (opts.capacity / opts.refillPerSec) * 1000;
+      if (now - bucket.lastRefill > idleMs) {
+        buckets.delete(key);
+      }
+    }
+  }, EVICTION_INTERVAL_MS).unref();
 
   return (req, res, next) => {
     const key = keyFn(req);

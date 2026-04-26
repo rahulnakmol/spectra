@@ -1,4 +1,4 @@
-import { Router, type Router as ExpressRouter } from 'express';
+import { Router } from 'express';
 import { audit } from '../obs/audit.js';
 
 export interface HealthRouterOptions {
@@ -7,7 +7,7 @@ export interface HealthRouterOptions {
   readinessProbes: Array<() => Promise<void>>;
 }
 
-export function healthRouter(opts: HealthRouterOptions): ExpressRouter {
+export function healthRouter(opts: HealthRouterOptions): Router {
   const router = Router();
   router.get('/health', (_req, res) => res.status(200).json({ status: 'up' }));
   router.get('/ready', async (_req, res) => {
