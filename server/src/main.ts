@@ -1,32 +1,17 @@
-import express from 'express';
 import { loadAppConfig } from './config/index.js';
-import { initAppInsights } from './obs/appInsights.js';
+import { initAppInsights, getAppInsightsClient } from './obs/appInsights.js';
 import { audit } from './obs/audit.js';
-import { securityHeaders } from './middleware/security.js';
-import { rateLimit } from './middleware/rateLimit.js';
-import { healthRouter } from './routes/health.js';
 import { makeKeyVaultProbe } from './probes/keyVault.js';
-import { errorMiddleware } from './errors/middleware.js';
-import { NotFoundError } from './errors/domain.js';
+import { createApp } from './app.js';
+
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 async function main(): Promise<void> {
   const cfg = await loadAppConfig();
   initAppInsights(cfg.env.APPLICATIONINSIGHTS_CONNECTION_STRING);
 
-  const app = express();
-  app.disable('x-powered-by');
-  app.set('trust proxy', 1);
-  app.use(securityHeaders());
-  app.use(
-    rateLimit({ capacity: 60, refillPerSec: 1, keyFn: (req) => req.ip ?? 'unknown' }),
-  );
-  app.use(express.json({ limit: '1mb' }));
-
   const probe = makeKeyVaultProbe(cfg.env.AZURE_KEY_VAULT_URI);
-  app.use(healthRouter({ readinessProbes: [probe] }));
-
-  app.use((_req, _res, next) => next(new NotFoundError()));
-  app.use(errorMiddleware);
+  const app = createApp({ readinessProbes: [probe] });
 
   const server = app.listen(cfg.env.PORT, () => {
     audit({
@@ -39,9 +24,48 @@ async function main(): Promise<void> {
     console.error(`server listening on :${cfg.env.PORT}`);
   });
 
+  // app.listen does not throw on EADDRINUSE/EACCES — it emits an 'error' event.
+  // Without this handler, the failure crashes unhandled after main() resolves.
+  server.on('error', (err) => {
+    audit({
+      userOid: 'system',
+      action: 'server.startup',
+      outcome: 'failure',
+      detail: { message: err instanceof Error ? err.message : String(err) },
+    });
+    // eslint-disable-next-line no-console
+    console.error('Listen failed:', err);
+    process.exit(1);
+  });
+
+  // Re-entrancy guard: SIGTERM and SIGINT can both arrive (e.g., dev Ctrl+C
+  // immediately after platform sends SIGTERM); calling server.close() twice
+  // emits a "Server is not running" error.
+  let stopping = false;
   const shutdown = (sig: string): void => {
-    audit({ userOid: 'system', action: 'server.shutdown', outcome: 'success', detail: { signal: sig } });
-    server.close(() => process.exit(0));
+    if (stopping) return;
+    stopping = true;
+    audit({
+      userOid: 'system',
+      action: 'server.shutdown',
+      outcome: 'success',
+      detail: { signal: sig },
+    });
+    // Hard deadline: a stuck keep-alive connection would block server.close()
+    // indefinitely; the platform SIGKILL grace is finite (~30s on Container Apps).
+    const force = setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS).unref();
+    const finish = (): void => {
+      clearTimeout(force);
+      server.close(() => process.exit(0));
+    };
+    // App Insights buffers telemetry — flush before exit so the shutdown audit
+    // event isn't lost. In dev/test (no client), close immediately.
+    const client = getAppInsightsClient();
+    if (client) {
+      client.flush({ callback: finish });
+    } else {
+      finish();
+    }
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
