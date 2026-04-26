@@ -85,6 +85,29 @@ describe('share route', () => {
     expect(r.status).toBe(400);
   });
 
+  it('admin can share a file uploaded by another user', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    const admin: SessionClaims = {
+      ...member,
+      userOid: 'U-ADMIN',
+      isAdmin: true,
+    };
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/users/alice%40contoso.com').query(true).reply(200, { id: 'OID-A' })
+      .get('/v1.0/drives/D1/items/IT').query(true).reply(200, {
+        id: 'IT', name: 'a.pdf',
+        createdBy: { user: { id: 'U-OTHER' } },
+        listItem: { fields: { UploadedByOid: 'U-OTHER' } },
+      })
+      .post('/v1.0/drives/D1/items/IT/createLink').reply(200, { link: { webUrl: 'https://share/x' }, id: 'PERM' })
+      .post('/v1.0/users/U-ADMIN/sendMail').reply(202);
+    const r = await request(makeApp(admin))
+      .post('/api/files/IT/share')
+      .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
+    expect(r.status).toBe(200);
+    expect(r.body.shareUrl).toBe('https://share/x');
+  });
+
   it('rejects share when user does not own the file (only-own)', async () => {
     const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
     nock('https://graph.microsoft.com')

@@ -40,12 +40,18 @@ export function sharingRouter(deps: SharingRouterDeps): Router {
 
       const item = await getItem(client, driveId, req.params['id'] ?? '');
       const fields = (item.listItem?.fields ?? {}) as Record<string, unknown>;
-      const ownerOid = String(fields['UploadedByOid'] ?? item.createdBy?.user?.id ?? '');
+      const ownerOid = typeof fields['UploadedByOid'] === 'string' ? fields['UploadedByOid'] : undefined;
       if (!req.session.isAdmin && ownerOid !== req.session.userOid) {
         throw new ForbiddenError('You can only share files you uploaded');
       }
 
       const link = await createSharingLink(client, driveId, item.id, { expiresAt: body.expiresAt });
+
+      audit({
+        userOid: req.session.userOid, action: 'files.share',
+        workspace: body.ws, resourceId: item.id, outcome: 'success',
+        detail: { recipientCount: recipients.length, expiresAt: body.expiresAt },
+      });
 
       const recipientList = recipients.map((rec) => ({ emailAddress: { address: rec.upn } }));
       const message = body.message ?? '';
@@ -58,11 +64,6 @@ export function sharingRouter(deps: SharingRouterDeps): Router {
         saveToSentItems: false,
       });
 
-      audit({
-        userOid: req.session.userOid, action: 'files.share',
-        workspace: body.ws, resourceId: item.id, outcome: 'success',
-        detail: { recipientCount: recipients.length, expiresAt: body.expiresAt },
-      });
       res.json({ shareUrl: link.webUrl, expiresAt: body.expiresAt });
     } catch (err) { next(err); }
   };
