@@ -1,4 +1,5 @@
-import { loadAppConfig } from './config/index.js';
+import { loadEnv } from './config/env.js';
+import { loadSecrets } from './config/secrets.js';
 import { initAppInsights, getAppInsightsClient } from './obs/appInsights.js';
 import { audit } from './obs/audit.js';
 import { makeKeyVaultProbe } from './probes/keyVault.js';
@@ -7,21 +8,30 @@ import { createApp } from './app.js';
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 async function main(): Promise<void> {
-  const cfg = await loadAppConfig();
-  initAppInsights(cfg.env.APPLICATIONINSIGHTS_CONNECTION_STRING);
+  const env = loadEnv();
+  initAppInsights(env.APPLICATIONINSIGHTS_CONNECTION_STRING);
 
-  const probe = makeKeyVaultProbe(cfg.env.AZURE_KEY_VAULT_URI);
+  // Secrets are required for auth/session routes (later phases). At P1,
+  // no such routes are mounted, so a KV failure is logged but not fatal —
+  // the server still starts and /health returns 200. /ready will return 503
+  // via the KV probe until the vault is reachable.
+  await loadSecrets(env.AZURE_KEY_VAULT_URI).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error('Secrets unavailable at startup (non-fatal at P1):', err instanceof Error ? err.message : String(err));
+  });
+
+  const probe = makeKeyVaultProbe(env.AZURE_KEY_VAULT_URI);
   const app = createApp({ readinessProbes: [probe] });
 
-  const server = app.listen(cfg.env.PORT, () => {
+  const server = app.listen(env.PORT, () => {
     audit({
       userOid: 'system',
       action: 'server.startup',
       outcome: 'success',
-      detail: { port: cfg.env.PORT, nodeEnv: cfg.env.NODE_ENV },
+      detail: { port: env.PORT, nodeEnv: env.NODE_ENV },
     });
     // eslint-disable-next-line no-console
-    console.error(`server listening on :${cfg.env.PORT}`);
+    console.error(`server listening on :${env.PORT}`);
   });
 
   // app.listen does not throw on EADDRINUSE/EACCES — it emits an 'error' event.
