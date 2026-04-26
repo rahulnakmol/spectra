@@ -45,7 +45,7 @@ jobs:
           load: true
           tags: spectra:ci
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@0.31.0
         with:
           image-ref: spectra:ci
           format: table
