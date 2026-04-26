@@ -1,0 +1,12 @@
+{
+  "displayName": "Contracts",
+  "template": "contracts",
+  "folderConvention": ["Counterparty", "YYYY"],
+  "metadataSchema": [
+    { "name": "Counterparty", "type": "string", "required": true, "indexed": true },
+    { "name": "ContractNumber", "type": "string", "required": true, "indexed": true },
+    { "name": "EffectiveDate", "type": "date", "required": true, "indexed": false },
+    { "name": "ExpirationDate", "type": "date", "required": false, "indexed": false },
+    { "name": "Status", "type": "enum", "required": true, "indexed": false, "enumValues": ["Draft", "Executed", "Expired", "Terminated"] }
+  ]
+}
