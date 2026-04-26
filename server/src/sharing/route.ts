@@ -2,6 +2,7 @@ import { Router, type Request, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { ShareRequestSchema } from '@spectra/shared';
 import { BadRequestError, ForbiddenError, UnauthenticatedError } from '../errors/domain.js';
+import { mapGraphErrorToDomain, type GraphLikeError } from '../spe/types.js';
 import { audit } from '../obs/audit.js';
 import { requireAuth } from '../auth/session.js';
 import { getItem } from '../spe/drives.js';
@@ -65,7 +66,22 @@ export function sharingRouter(deps: SharingRouterDeps): Router {
       });
 
       res.json({ shareUrl: link.webUrl, expiresAt: body.expiresAt });
-    } catch (err) { next(err); }
+    } catch (rawErr) {
+      const err = (rawErr !== null && typeof rawErr === 'object' && 'statusCode' in rawErr)
+        ? mapGraphErrorToDomain(rawErr as GraphLikeError)
+        : rawErr;
+      const ws = typeof req.body?.ws === 'string' ? req.body.ws : undefined;
+      const rid = req.params['id'];
+      audit({
+        userOid: req.session?.userOid ?? 'unknown',
+        action: 'files.share',
+        ...(rid !== undefined ? { resourceId: rid } : {}),
+        ...(ws !== undefined ? { workspace: ws } : {}),
+        outcome: 'failure',
+        detail: { error: err instanceof Error ? err.message : String(err) },
+      });
+      next(err);
+    }
   };
   r.post('/api/files/:id/share', requireAuth, handler);
   return r;

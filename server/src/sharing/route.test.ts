@@ -108,6 +108,31 @@ describe('share route', () => {
     expect(r.body.shareUrl).toBe('https://share/x');
   });
 
+  it('returns 404 when file does not exist', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/users/alice%40contoso.com').query(true).reply(200, { id: 'OID-A' })
+      .get('/v1.0/drives/D1/items/MISSING').query(true).reply(404, { error: { code: 'itemNotFound', message: 'Item not found' } });
+    const r = await request(makeApp())
+      .post('/api/files/MISSING/share')
+      .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
+    expect(r.status).toBe(404);
+  });
+
+  it('returns 401 when not authenticated', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    const app = express();
+    app.use(express.json());
+    // No session middleware — req.session will be undefined, triggering requireAuth rejection
+    const graph = createGraphClient(async () => 'TOK');
+    app.use(sharingRouter({ store: makeStore(), graphForUser: () => graph }));
+    app.use(errorMiddleware);
+    const r = await request(app)
+      .post('/api/files/IT/share')
+      .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
+    expect(r.status).toBe(401);
+  });
+
   it('rejects share when user does not own the file (only-own)', async () => {
     const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
     nock('https://graph.microsoft.com')
