@@ -20,7 +20,18 @@ See `docs/superpowers/specs/2026-04-24-spectra-design.md` for full decisions.
 - **Infra:** Terraform (Azure) — Container Apps, ACR, Key Vault, App Insights, Storage, Entra app reg.
 - **CI:** GitHub Actions.
 
-## 3. Repository layout
+## 3. Current build state
+
+| Phase | Status | Branch |
+|---|---|---|
+| P1 Foundation (scaffold, Docker, CI) | ✅ merged to main | — |
+| P2 BFF features (auth, SPE, upload, sharing) | 🔜 next | `feat/p2-bff-features` |
+| P3 Frontend (React SPA, Fluent UI, a11y) | 📋 planned | `feat/p3-frontend` |
+| P4 Infrastructure (Terraform, deploy.yml) | 📋 planned | `feat/p4-infra` |
+
+Plans: `docs/superpowers/plans/`
+
+## 3b. Repository layout
 
 ```
 .
@@ -46,15 +57,18 @@ Local development requires: Node 20+, a dev Entra ID app registration, a dev SPE
 
 ```bash
 npm install                 # workspaces install (web + server + shared)
-npm run dev                 # runs server on :3000 and vite on :5173 with /api proxy
+npm run dev                 # runs server on :3000 (Vite dev server added in P3)
 npm run build               # builds shared → server → web, outputs server/dist/
-npm run test                # runs all test suites (vitest + jest)
-npm run test:a11y           # axe-core accessibility tests (Playwright)
-npm run lint                # eslint + stylelint across all workspaces
+npm run test                # builds @spectra/shared first, then all test suites
+npm run lint                # eslint across all workspaces
 npm run typecheck           # tsc --noEmit across workspaces
 npm run docker:build        # builds the production image
 npm run docker:run          # runs the image locally against dev Azure resources
 
+# P3 (not yet available):
+npm run test:a11y           # axe-core accessibility tests via Playwright
+
+# P4 (not yet available):
 cd infra && terraform plan  # IaC plan against the selected workspace
 cd infra && terraform apply # IaC apply (use workspace: dev / staging / prod)
 ```
@@ -123,11 +137,11 @@ Before raising a PR, run these in parallel:
 Merging to `main` requires all of the following to be green:
 
 - Typecheck, lint, unit tests (all workspaces)
-- Accessibility tests (axe-core via Playwright)
-- `npm audit --production` (no high/critical)
-- Trivy image scan (no high/critical)
+- `npm audit --omit=dev --audit-level=high` (no high/critical)
+- Trivy image scan (no high/critical) — CLI install, not action
 - Build + image publish
-- Terraform plan (if `infra/` touched) reviewed in PR comment
+- Accessibility tests (axe-core via Playwright) — added in P3
+- Terraform plan (if `infra/` touched) reviewed in PR comment — added in P4
 
 ## 6. Conventions
 
@@ -210,7 +224,41 @@ Living documents under `docs/runbooks/`:
 - `incident-response.md` — auth-failure spike, Graph throttling, quarantine burst.
 - `rotation.md` — Key Vault secret rotation procedure.
 
-## 9. When in doubt
+## 9. Gotchas
+
+- **`@spectra/shared` must be built before typecheck/lint/test.** `dist/` is the published entry point. `npm run test` does this automatically; when running workspace commands manually, run `npm -w @spectra/shared run build` first or they fail with "Cannot find module '@spectra/shared'".
+- **Rate limiter is in-memory.** Token buckets reset on restart; not suitable for multi-replica or sticky-session scenarios until P2 adds a store.
+- **`main.ts` is excluded from coverage.** It wires process signals and can't be unit-tested; the `createApp` integration path is covered via `app.test.ts`.
+- **`.env.local` not `.env`.** `.env` is gitignored but also not loaded by dotenv in prod; always use `.env.local` locally and `.env.example` as reference.
+- **Alpine 3.21 base image.** Dockerfile pins `node:20-alpine3.21` + `apk upgrade --no-cache`. Do not downgrade; Alpine 3.20.x has unpatched OpenSSL/musl CVEs.
+- **npm removed from runtime image.** `npm uninstall -g npm` runs after `npm ci` in the runtime stage. The container has no npm — only node. Don't add npm-dependent RUN steps after that line.
+
+## 9b. Current `server/src/` structure (P1)
+
+```
+server/src/
+├── main.ts               # process wiring (env, secrets, signals)
+├── app.ts                # createApp() — Express factory, all middleware
+├── config/
+│   ├── env.ts            # Zod env validation, loadEnv()
+│   ├── secrets.ts        # Key Vault secret loader, loadSecrets()
+│   └── index.ts          # AppConfig composer
+├── errors/
+│   ├── domain.ts         # DomainError abstract + subtypes
+│   └── middleware.ts     # Express error handler → HTTP translation
+├── middleware/
+│   ├── security.ts       # CSP, HSTS, X-Frame-Options headers
+│   └── rateLimit.ts      # Token-bucket rate limiter
+├── obs/
+│   ├── appInsights.ts    # SDK init wrapper
+│   └── audit.ts          # audit() helper + hashIp()
+├── probes/
+│   └── keyVault.ts       # /ready readiness probe
+└── routes/
+    └── health.ts         # /health + /ready endpoints
+```
+
+## 10. When in doubt
 
 - **Cross-reference the design spec first.** If the spec doesn't answer the question, surface it and propose an update to the spec before writing code.
 - **Follow existing patterns in the codebase.** If a pattern is absent, match the conventions in this file.
