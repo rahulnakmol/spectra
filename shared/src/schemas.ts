@@ -96,3 +96,30 @@ export const ShareRequestSchema = z.object({
   expiresAt: z.string().datetime(),
 });
 export type ShareRequest = z.infer<typeof ShareRequestSchema>;
+
+export const ListFilesQuerySchema = z.object({
+  ws: z.string().min(1),
+  team: z.string().regex(/^[A-Z0-9_]+$/).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  skipToken: z.string().max(2048).optional(),
+});
+export type ListFilesQuery = z.infer<typeof ListFilesQuerySchema>;
+
+export const SearchQuerySchema = z.object({
+  ws: z.string().min(1),
+  q: z.string().min(2).max(256),
+  skipToken: z.string().max(2048).optional(),
+});
+export type SearchQuery = z.infer<typeof SearchQuerySchema>;
+
+export const FileItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  folderPath: z.string(),
+  uploadedByOid: z.string(),
+  uploadedByDisplayName: z.string(),
+  uploadedAt: z.string(),
+  sizeBytes: z.number(),
+  metadata: z.record(z.union([z.string(), z.number(), z.null()])),
+});

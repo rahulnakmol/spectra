@@ -3,7 +3,19 @@ import { loadSecrets } from './config/secrets.js';
 import { initAppInsights, getAppInsightsClient } from './obs/appInsights.js';
 import { audit } from './obs/audit.js';
 import { makeKeyVaultProbe } from './probes/keyVault.js';
+import { makeGraphProbe } from './probes/graph.js';
 import { createApp } from './app.js';
+import { createConfigStore, createSessionStore, createSpeReader, createSpeWriter, createSpeDeleter, startConfigPoller } from './store/index.js';
+import { ConfidentialClientApplication } from '@azure/msal-node';
+import { createMsalClient } from './auth/msal.js';
+import { createTokenBroker } from './auth/tokenBroker.js';
+import { createGraphClient } from './spe/client.js';
+import { createContainerProvisioner } from './admin/provision.js';
+import { createAuditQuery } from './obs/auditQuery.js';
+import type { AdminRouterDeps } from './routes/admin.js';
+import type { Request } from 'express';
+import type { SpeGraphClient } from './spe/index.js';
+import { UnauthenticatedError } from './errors/domain.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -11,20 +23,69 @@ async function main(): Promise<void> {
   const env = loadEnv();
   initAppInsights(env.APPLICATIONINSIGHTS_CONNECTION_STRING);
 
-  // Secrets are required for auth/session routes (later phases). At P1,
-  // no such routes are mounted, so a KV failure is logged but not fatal —
-  // the server still starts and /health returns 200. /ready will return 503
-  // via the KV probe until the vault is reachable.
-  // TODO(P2): when auth/session routes are mounted, capture the resolved
-  // Secrets object here and gate those routes on secrets != null; this
-  // .catch must re-throw (or the route mount must assert secrets loaded).
-  await loadSecrets(env.AZURE_KEY_VAULT_URI).catch((err: unknown) => {
-    // eslint-disable-next-line no-console
-    console.error('Secrets unavailable at startup (non-fatal at P1):', err instanceof Error ? err.message : String(err));
+  // Secrets are required for auth/session routes (P2+).
+  const secrets = await loadSecrets(env.AZURE_KEY_VAULT_URI);
+
+  const msal = createMsalClient(
+    {
+      tenantId: env.AZURE_TENANT_ID,
+      clientId: env.AZURE_CLIENT_ID,
+      clientSecret: secrets.aadClientSecret,
+      redirectUri: `${env.APP_BASE_URL}/api/auth/callback`,
+    },
+    { ConfidentialClientApplication },
+  );
+  const tokenBroker = createTokenBroker(msal);
+
+  const appGraph = createGraphClient(() =>
+    tokenBroker.app(['https://graph.microsoft.com/.default']),
+  );
+
+  const configReader = createSpeReader(appGraph, env.AZURE_SYSTEM_CONTAINER_ID);
+  const configWriter = createSpeWriter(appGraph, env.AZURE_SYSTEM_CONTAINER_ID);
+  const configStore = createConfigStore({ reader: configReader, writer: configWriter });
+  startConfigPoller(configStore);
+
+  const sessionStore = createSessionStore({
+    reader: createSpeReader(appGraph, env.AZURE_SYSTEM_CONTAINER_ID),
+    writer: createSpeWriter(appGraph, env.AZURE_SYSTEM_CONTAINER_ID),
+    deleter: createSpeDeleter(appGraph, env.AZURE_SYSTEM_CONTAINER_ID),
+    encryptionKey: secrets.sessionEncryptionKey,
   });
 
-  const probe = makeKeyVaultProbe(env.AZURE_KEY_VAULT_URI);
-  const app = createApp({ readinessProbes: [probe] });
+  const graphForUser = (req: Request): SpeGraphClient => {
+    if (!req.session) throw new UnauthenticatedError('graphForUser called without session');
+    return createGraphClient(async () =>
+      tokenBroker.obo(
+        { sessionId: req.session!.sessionId, userAccessToken: req.session!.userAccessToken },
+        ['https://graph.microsoft.com/.default'],
+      ),
+    );
+  };
+  const graphAppOnly = (): SpeGraphClient => appGraph;
+
+  const routesP2 = {
+    msal,
+    sessionStore,
+    configStore,
+    hmacKey: secrets.cookieHmacKey,
+    slidingMin: env.SESSION_TTL_SLIDING_MIN,
+    absoluteMin: env.SESSION_TTL_ABSOLUTE_MIN,
+    secureCookie: env.NODE_ENV === 'production',
+    graphForUser,
+    graphAppOnly,
+    tokenBroker,
+    adminDeps: {
+      provisionContainer: createContainerProvisioner(appGraph, env.AZURE_CONTAINER_TYPE_ID),
+      // Cast resolves exactOptionalPropertyTypes mismatch between Zod-inferred
+      // params (no `| undefined`) and createAuditQuery's declared signature.
+      auditQuery: createAuditQuery({ logsClient: null }) as AdminRouterDeps['auditQuery'],
+    },
+  };
+
+  const kvProbe = makeKeyVaultProbe(env.AZURE_KEY_VAULT_URI);
+  const graphProbe = makeGraphProbe();
+  const app = createApp({ readinessProbes: [kvProbe, graphProbe], routesP2 });
 
   const server = app.listen(env.PORT, () => {
     audit({

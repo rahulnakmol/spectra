@@ -1,0 +1,6 @@
+{
+  "displayName": "New Workspace",
+  "template": "blank",
+  "folderConvention": ["YYYY", "MM"],
+  "metadataSchema": []
+}

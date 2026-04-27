@@ -1,0 +1,11 @@
+{
+  "displayName": "HR Documents",
+  "template": "hr-docs",
+  "folderConvention": ["DocumentType", "YYYY"],
+  "metadataSchema": [
+    { "name": "EmployeeId", "type": "string", "required": true, "indexed": true },
+    { "name": "DocumentType", "type": "string", "required": true, "indexed": true },
+    { "name": "EffectiveDate", "type": "date", "required": true, "indexed": false },
+    { "name": "Confidentiality", "type": "enum", "required": true, "indexed": false, "enumValues": ["Internal", "Restricted", "HR-Only"] }
+  ]
+}

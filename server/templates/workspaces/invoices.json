@@ -1,0 +1,11 @@
+{
+  "displayName": "AP Invoices",
+  "template": "invoices",
+  "folderConvention": ["Team", "YYYY", "MM"],
+  "metadataSchema": [
+    { "name": "Vendor", "type": "string", "required": true, "indexed": true },
+    { "name": "InvoiceNumber", "type": "string", "required": true, "indexed": true },
+    { "name": "Amount", "type": "number", "required": true, "indexed": false },
+    { "name": "Currency", "type": "string", "required": true, "indexed": false }
+  ]
+}
