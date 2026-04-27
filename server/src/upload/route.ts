@@ -1,6 +1,6 @@
 import { Router, type Request, type RequestHandler, type ErrorRequestHandler } from 'express';
 import multer, { MulterError } from 'multer';
-import { UploadRequestSchema, type WorkspaceConfig, type MetadataField } from '@spectra/shared';
+import { UploadRequestSchema, type MetadataField } from '@spectra/shared';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthenticatedError } from '../errors/domain.js';
 import { audit } from '../obs/audit.js';
 import { requireAuth } from '../auth/session.js';

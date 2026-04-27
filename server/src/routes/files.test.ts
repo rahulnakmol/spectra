@@ -6,7 +6,7 @@ import nodeFetch from 'node-fetch';
 import { filesRouter } from './files.js';
 import { errorMiddleware } from '../errors/middleware.js';
 import { createGraphClient } from '../spe/client.js';
-import { NotFoundError, ForbiddenError } from '../errors/domain.js';
+import { NotFoundError } from '../errors/domain.js';
 import type { SpeGraphClient } from '../spe/index.js';
 import type { SessionClaims } from '@spectra/shared';
 import type { ConfigStore } from '../store/configStore.js';
