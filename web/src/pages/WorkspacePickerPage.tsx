@@ -28,6 +28,7 @@ export function WorkspacePickerPage(): JSX.Element {
         <Text>No workspaces are configured yet.</Text>
       ) : (
         <ul
+          role="list"
           className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 list-none p-0"
           aria-label="Available workspaces"
         >

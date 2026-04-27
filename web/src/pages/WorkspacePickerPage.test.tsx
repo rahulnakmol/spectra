@@ -8,8 +8,9 @@ import { WorkspacePickerPage } from './WorkspacePickerPage';
 
 describe('WorkspacePickerPage', () => {
   const originalFetch = global.fetch;
+  const originalLocation = window.location;
   beforeEach(() => {
-    Object.defineProperty(window, 'location', { value: { origin: 'http://localhost', href: '/' }, writable: true });
+    Object.defineProperty(window, 'location', { value: { origin: 'http://localhost', href: '/' }, writable: true, configurable: true });
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/auth/me')) return Promise.resolve(
         new Response(JSON.stringify({
@@ -26,7 +27,11 @@ describe('WorkspacePickerPage', () => {
       return Promise.resolve(new Response('{}', { status: 200 }));
     });
   });
-  afterEach(() => { global.fetch = originalFetch; vi.restoreAllMocks(); });
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: originalLocation, writable: true, configurable: true });
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
 
   it('renders accessible tiles, dimming workspaces the user does not belong to', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -41,6 +46,8 @@ describe('WorkspacePickerPage', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument());
     expect(await screen.findByRole('link', { name: /open ap invoices/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /do not have access/i })).toHaveAttribute('aria-disabled');
+    const disabledTile = screen.getByLabelText(/do not have access/i);
+    expect(disabledTile).toBeInTheDocument();
+    expect(disabledTile).toHaveAttribute('aria-disabled', 'true');
   });
 });

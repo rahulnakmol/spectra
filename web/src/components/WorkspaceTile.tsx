@@ -1,4 +1,4 @@
-import { Card, CardHeader, Text, Tooltip, Badge } from '@fluentui/react-components';
+import { makeStyles, Card, CardHeader, Text, Tooltip, Badge } from '@fluentui/react-components';
 import { Link } from 'react-router-dom';
 import type { WorkspaceConfig } from '@spectra/shared';
 
@@ -7,13 +7,21 @@ interface Props {
   hasAccess: boolean;
 }
 
+const useStyles = makeStyles({
+  disabledCard: {
+    opacity: '0.5',
+    cursor: 'not-allowed',
+  },
+});
+
 export function WorkspaceTile({ workspace, hasAccess }: Props): JSX.Element {
+  const styles = useStyles();
   const tooltip = hasAccess
     ? `Open ${workspace.displayName}`
     : 'You do not have access to this workspace. Contact your administrator.';
 
   const inner = (
-    <Card style={{ opacity: hasAccess ? 1 : 0.5, cursor: hasAccess ? 'pointer' : 'not-allowed' }}>
+    <Card className={hasAccess ? undefined : styles.disabledCard}>
       <CardHeader
         header={<Text weight="semibold">{workspace.displayName}</Text>}
         description={
@@ -27,17 +35,16 @@ export function WorkspaceTile({ workspace, hasAccess }: Props): JSX.Element {
   );
 
   return (
-    <Tooltip content={tooltip} relationship="description">
+    <Tooltip content={tooltip} relationship="label">
       {hasAccess ? (
         <Link
           to={`/w/${workspace.id}/browse`}
-          aria-label={tooltip}
           className="no-underline"
         >
           {inner}
         </Link>
       ) : (
-        <div role="button" aria-disabled aria-label={tooltip} tabIndex={0}>
+        <div aria-label={tooltip} aria-disabled="true">
           {inner}
         </div>
       )}
