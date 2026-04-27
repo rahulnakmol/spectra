@@ -231,4 +231,33 @@ describe('upload route', () => {
       .attach('file', PDF, 'invoice.pdf');
     expect(r.status).toBe(400);
   });
+
+  it('admin can upload without team membership', async () => {
+    const adminSession: SessionClaims = {
+      sessionId: 'S', userOid: '00000000-0000-0000-0000-000000000099', tenantId: 'T', isAdmin: true,
+      teamMemberships: [],
+      issuedAt: 0, expiresAt: 9_999_999_999_999, absoluteExpiresAt: 9_999_999_999_999, lastSlidingUpdate: 0,
+      userAccessToken: 'AT',
+    };
+    // Admin has no teamMember match, so folder path uses teamCode ('AP') directly, not teamDisplayName
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/drives/D1/root:/AP/2026/04:').reply(200, { id: 'F-MONTH' })
+      .get('/v1.0/drives/D1/root:/AP/2026/04/invoice.pdf:').reply(404, { error: { code: 'itemNotFound' } })
+      .put('/v1.0/drives/D1/items/F-MONTH:/invoice.pdf:/content').reply(201, { id: 'ADM-NEW', name: 'invoice.pdf' })
+      .patch('/v1.0/drives/D1/items/ADM-NEW/listItem/fields', (b) =>
+        b.Vendor === 'V' && b.InvoiceNumber === 'I-1' && b.Amount === 1 && b.Currency === 'USD'
+        && b.UploadedByOid === '00000000-0000-0000-0000-000000000099' && typeof b.UploadedAt === 'string')
+      .reply(200, {})
+      .post('/v1.0/drives/D1/items/ADM-NEW/invite', (b) => b.roles[0] === 'read' && b.requireSignIn === true)
+      .reply(200, {});
+
+    const r = await request(makeApp(adminSession))
+      .post('/api/upload')
+      .field('workspaceId', 'invoices').field('teamCode', 'AP')
+      .field('year', '2026').field('month', '4')
+      .field('metadata', JSON.stringify({ Vendor: 'V', InvoiceNumber: 'I-1', Amount: 1, Currency: 'USD' }))
+      .attach('file', PDF, 'invoice.pdf');
+    expect(r.status).toBe(201);
+    expect(r.body.id).toBe('ADM-NEW');
+  });
 });

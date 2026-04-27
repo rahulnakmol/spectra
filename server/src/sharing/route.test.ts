@@ -158,4 +158,16 @@ describe('share route', () => {
       .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
     expect(r.status).toBe(403);
   });
+
+  it('returns 403 when file has no listItem (no UploadedByOid)', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    nock('https://graph.microsoft.com')
+      .get('/v1.0/users/alice%40contoso.com').query(true).reply(200, { id: 'OID-A' })
+      // Item returned with no listItem field — ownerOid resolves to undefined
+      .get('/v1.0/drives/D1/items/IT').query(true).reply(200, { id: 'IT', name: 'test.pdf' });
+    const r = await request(makeApp())
+      .post('/api/files/IT/share')
+      .send({ ws: 'invoices', recipientUpns: ['alice@contoso.com'], expiresAt: future });
+    expect(r.status).toBe(403);
+  });
 });

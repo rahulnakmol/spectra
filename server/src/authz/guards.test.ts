@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
+import type { RequestHandler } from 'express';
 import { requireRole, requireWorkspaceAccess } from './guards.js';
 import { errorMiddleware } from '../errors/middleware.js';
 import type { SessionClaims } from '@spectra/shared';
@@ -54,5 +55,24 @@ describe('guards', () => {
     app.use(errorMiddleware);
     const r = await request(app).get('/ws');
     expect(r.status).toBe(400);
+  });
+
+  it('requireRole with unknown role value passes through (current behavior)', async () => {
+    const app = express();
+    app.use((req, _r, n) => { (req as never as { session: SessionClaims }).session = { ...member, isAdmin: false }; n(); });
+    // Call with a non-'admin' role value bypassing TypeScript
+    app.get('/test', (requireRole as unknown as (r: string) => RequestHandler)('viewer'), (_req, res) => res.status(200).json({}));
+    app.use(errorMiddleware);
+    const r = await request(app).get('/test');
+    expect(r.status).toBe(200); // non-'admin' role passes through (guard only checks for 'admin')
+  });
+
+  it('requireWorkspaceAccess with custom paramName reads from that param', async () => {
+    const app = express();
+    app.use((req, _r, n) => { (req as never as { session: SessionClaims }).session = { ...member, teamMemberships: [{ workspaceId: 'ws1', teamCode: 'T', teamDisplayName: 'T' }] }; n(); });
+    app.get('/test/:workspaceId', requireWorkspaceAccess('workspaceId'), (_req, res) => res.status(200).json({}));
+    app.use(errorMiddleware);
+    const r = await request(app).get('/test/ws1');
+    expect(r.status).toBe(200);
   });
 });

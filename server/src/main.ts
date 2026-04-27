@@ -15,6 +15,7 @@ import { createAuditQuery } from './obs/auditQuery.js';
 import type { AdminRouterDeps } from './routes/admin.js';
 import type { Request } from 'express';
 import type { SpeGraphClient } from './spe/index.js';
+import { UnauthenticatedError } from './errors/domain.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -53,11 +54,10 @@ async function main(): Promise<void> {
   });
 
   const graphForUser = (req: Request): SpeGraphClient => {
-    const session = req.session;
-    if (!session) return appGraph;
+    if (!req.session) throw new UnauthenticatedError('graphForUser called without session');
     return createGraphClient(async () =>
       tokenBroker.obo(
-        { sessionId: session.sessionId, userAccessToken: session.userAccessToken },
+        { sessionId: req.session!.sessionId, userAccessToken: req.session!.userAccessToken },
         ['https://graph.microsoft.com/.default'],
       ),
     );

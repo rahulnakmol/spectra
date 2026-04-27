@@ -3,6 +3,7 @@ import type { SessionClaims } from '@spectra/shared';
 import { UnauthenticatedError } from '../errors/domain.js';
 import { SESSION_COOKIE_NAME, verifySessionCookie } from './cookies.js';
 import type { SessionStore } from '../store/sessionStore.js';
+import { getAppInsightsClient } from '../obs/appInsights.js';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -47,7 +48,13 @@ export function sessionMiddleware(opts: SessionMiddlewareOpts): RequestHandler {
     if (!claims) return next();
     const now = Date.now();
     if (claims.expiresAt <= now || claims.absoluteExpiresAt <= now) {
-      try { await opts.store.delete(sessionId); } catch { /* best-effort cleanup */ }
+      try { await opts.store.delete(sessionId); } catch (err) {
+        // Best-effort: do not block request, but surface failure
+        const appInsights = getAppInsightsClient();
+        if (appInsights) appInsights.trackException({ exception: err instanceof Error ? err : new Error(String(err)) });
+        // eslint-disable-next-line no-console
+        console.error('Session cleanup failed:', err instanceof Error ? err.message : String(err));
+      }
       return next();
     }
     if (now - claims.lastSlidingUpdate >= slideIntervalMs) {
