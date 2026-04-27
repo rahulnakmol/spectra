@@ -15,7 +15,7 @@ describe('PreviewPane', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'location', { value: { origin: 'http://localhost', href: '/' }, writable: true, configurable: true });
     global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ url: 'https://contoso.sharepoint.com/preview/abc' }),
+      new Response(JSON.stringify({ url: 'about:blank' }),
         { status: 200, headers: { 'content-type': 'application/json' } }),
     );
   });
