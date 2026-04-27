@@ -17,7 +17,6 @@ export function MetadataForm({ schema, values, onChange, errors }: Props): JSX.E
       <legend className="sr-only">File metadata</legend>
       {schema.map((f) => {
         const id = `meta-${f.name}`;
-        const errId = `${id}-err`;
         const err = errors[f.name];
         return (
           <Field
@@ -30,7 +29,6 @@ export function MetadataForm({ schema, values, onChange, errors }: Props): JSX.E
             {f.type === 'enum' && f.enumValues ? (
               <Dropdown
                 id={id}
-                {...(err ? { 'aria-describedby': errId } : {})}
                 value={String(values[f.name] ?? '')}
                 onOptionSelect={(_e, data) => onChange({ ...values, [f.name]: data.optionValue ?? '' })}
               >
@@ -40,7 +38,6 @@ export function MetadataForm({ schema, values, onChange, errors }: Props): JSX.E
               <Input
                 id={id}
                 type="number"
-                {...(err ? { 'aria-describedby': errId } : {})}
                 value={String(values[f.name] ?? '')}
                 onChange={(_e, data) => onChange({ ...values, [f.name]: data.value === '' ? '' : Number(data.value) })}
               />
@@ -48,7 +45,6 @@ export function MetadataForm({ schema, values, onChange, errors }: Props): JSX.E
               <Input
                 id={id}
                 type="date"
-                {...(err ? { 'aria-describedby': errId } : {})}
                 value={String(values[f.name] ?? '')}
                 onChange={(_e, data) => onChange({ ...values, [f.name]: data.value })}
               />
@@ -56,7 +52,6 @@ export function MetadataForm({ schema, values, onChange, errors }: Props): JSX.E
               <Input
                 id={id}
                 type="text"
-                {...(err ? { 'aria-describedby': errId } : {})}
                 value={String(values[f.name] ?? '')}
                 onChange={(_e, data) => onChange({ ...values, [f.name]: data.value })}
               />
