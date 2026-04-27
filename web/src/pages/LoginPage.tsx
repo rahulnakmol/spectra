@@ -18,7 +18,7 @@ export function LoginPage(): JSX.Element {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <section className="max-w-md w-full flex flex-col gap-6" aria-labelledby="login-title">
-        <Title1 id="login-title">{brand}</Title1>
+        <Title1 as="h1" id="login-title">{brand}</Title1>
         {settings.isLoading ? (
           <Spinner label="Loading…" />
         ) : (
