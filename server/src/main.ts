@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { loadEnv } from './config/env.js';
 import { loadSecrets } from './config/secrets.js';
 import { initAppInsights, getAppInsightsClient } from './obs/appInsights.js';
@@ -83,9 +84,17 @@ async function main(): Promise<void> {
     },
   };
 
+  const staticDir = env.NODE_ENV === 'production'
+    ? path.resolve(process.cwd(), 'web/dist')
+    : undefined;
+
   const kvProbe = makeKeyVaultProbe(env.AZURE_KEY_VAULT_URI);
   const graphProbe = makeGraphProbe();
-  const app = createApp({ readinessProbes: [kvProbe, graphProbe], routesP2 });
+  const app = createApp({
+    readinessProbes: [kvProbe, graphProbe],
+    routesP2,
+    ...(staticDir ? { staticDir } : {}),
+  });
 
   const server = app.listen(env.PORT, () => {
     audit({

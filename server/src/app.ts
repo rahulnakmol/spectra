@@ -1,4 +1,5 @@
-import express, { type Express, type Request } from 'express';
+import path from 'node:path';
+import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { securityHeaders } from './middleware/security.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { healthRouter } from './routes/health.js';
@@ -26,6 +27,7 @@ export interface CreateAppOptions {
   rateLimitCapacity?: number;
   rateLimitRefillPerSec?: number;
   routesP2?: P2RouteWiring;
+  staticDir?: string;
 }
 
 export interface P2RouteWiring {
@@ -80,6 +82,15 @@ export function createApp(opts: CreateAppOptions): Express {
     app.use(sharingRouter({ store: p.configStore, graphForUser: p.graphForUser }));
     app.use(adminRouter({ store: p.configStore, ...p.adminDeps }));
     app.use(agentRouter());
+  }
+
+  if (opts.staticDir) {
+    const dir = opts.staticDir;
+    app.use(express.static(dir, { index: false, maxAge: '1h' }));
+    app.get(/^(?!\/api)(?!\/health)(?!\/ready).*/u, (req: Request, res: Response, next: NextFunction) => {
+      if (req.method !== 'GET') return next();
+      res.sendFile(path.join(dir, 'index.html'));
+    });
   }
 
   app.use((_req, _res, next) => next(new NotFoundError()));

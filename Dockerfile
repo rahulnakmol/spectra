@@ -10,11 +10,14 @@ RUN npm ci --workspaces --include-workspace-root
 
 # ---- build --------------------------------------------------------
 FROM deps AS build
+WORKDIR /app
 COPY tsconfig.base.json ./
 COPY shared ./shared
 COPY server ./server
+COPY web ./web
 RUN npm -w @spectra/shared run build \
- && npm -w @spectra/server run build
+ && npm -w @spectra/server run build \
+ && npm -w @spectra/web run build
 
 # ---- runtime ------------------------------------------------------
 FROM node:20-alpine3.21 AS runtime
@@ -33,6 +36,7 @@ RUN npm ci --workspaces --include-workspace-root --omit=dev \
 # Copy built artifacts
 COPY --from=build /app/shared/dist ./shared/dist
 COPY --from=build /app/server/dist ./server/dist
+COPY --from=build /app/web/dist ./web/dist
 
 USER app
 EXPOSE 3000
