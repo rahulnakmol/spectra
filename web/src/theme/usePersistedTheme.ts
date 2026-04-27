@@ -12,14 +12,24 @@ async function persist(mode: ThemeMode): Promise<void> {
   }
 }
 
+function safeLocalStorage(): Storage | null {
+  try {
+    const s = window.localStorage;
+    // Guard against environments where localStorage exists but methods are stubs.
+    if (typeof s?.getItem !== 'function') return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
 export function usePersistedTheme(initial: ThemeMode): [ThemeMode, (m: ThemeMode) => void] {
   const [mode, setMode] = useState<ThemeMode>(() => {
-    if (typeof window === 'undefined') return initial;
-    return (window.localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? initial;
+    return (safeLocalStorage()?.getItem(STORAGE_KEY) as ThemeMode | null) ?? initial;
   });
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, mode);
+    safeLocalStorage()?.setItem(STORAGE_KEY, mode);
   }, [mode]);
 
   const update = useCallback((m: ThemeMode) => {

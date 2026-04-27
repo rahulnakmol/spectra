@@ -8,7 +8,21 @@ import { AppShell } from './AppShell';
 
 describe('AppShell', () => {
   const originalFetch = global.fetch;
+
+  // happy-dom localStorage stub
+  const store: Record<string, string> = {};
+  const localStorageMock: Storage = {
+    getItem: (k: string) => store[k] ?? null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+    clear: () => { Object.keys(store).forEach(k => { delete store[k]; }); },
+    get length() { return Object.keys(store).length; },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+  };
+
   beforeEach(() => {
+    Object.keys(store).forEach(k => { delete store[k]; });
+    Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true, configurable: true });
     Object.defineProperty(window, 'location', { value: { origin: 'http://localhost', href: '/' }, writable: true });
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/auth/me')) return Promise.resolve(

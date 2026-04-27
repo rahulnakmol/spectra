@@ -7,8 +7,21 @@ import { ThemeToggle } from './ThemeToggle';
 
 describe('ThemeToggle', () => {
   const originalFetch = global.fetch;
+
+  // happy-dom localStorage stub
+  const store: Record<string, string> = {};
+  const localStorageMock: Storage = {
+    getItem: (k: string) => store[k] ?? null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+    clear: () => { Object.keys(store).forEach(k => { delete store[k]; }); },
+    get length() { return Object.keys(store).length; },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+  };
+
   beforeEach(() => {
-    window.localStorage.clear();
+    Object.keys(store).forEach(k => { delete store[k]; });
+    Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true, configurable: true });
     Object.defineProperty(window, 'location', { value: { origin: 'http://localhost', href: '/' }, writable: true });
   });
   afterEach(() => { global.fetch = originalFetch; vi.restoreAllMocks(); });
@@ -26,6 +39,6 @@ describe('ThemeToggle', () => {
     );
     const btn = screen.getByRole('button', { name: /switch to dark theme/i });
     await userEvent.click(btn);
-    expect(window.localStorage.getItem('spectra.theme')).toBe('dark');
+    expect(localStorageMock.getItem('spectra.theme')).toBe('dark');
   });
 });

@@ -21,9 +21,9 @@ export function Breadcrumbs(): JSX.Element | null {
         <span key={`${s.label}-${i}`} className="inline-flex items-center">
           <BreadcrumbItem>
             {s.to && i < segments.length - 1 ? (
-              <BreadcrumbButton as={Link as never} {...({ to: s.to } as never)}>
-                {s.label}
-              </BreadcrumbButton>
+              <Link to={s.to} style={{ textDecoration: 'none' }}>
+                <BreadcrumbButton>{s.label}</BreadcrumbButton>
+              </Link>
             ) : (
               <BreadcrumbButton current>{s.label}</BreadcrumbButton>
             )}
