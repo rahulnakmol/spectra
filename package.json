@@ -20,6 +20,9 @@
     "docker:build": "docker build -t spectra:dev .",
     "docker:run": "docker run --rm -p 3000:3000 --env-file .env.docker spectra:dev"
   },
+  "overrides": {
+    "@fluentui/react-motion": "9.15.0"
+  },
   "devDependencies": {
     "@types/node": "20.12.7",
     "@typescript-eslint/eslint-plugin": "7.7.0",
