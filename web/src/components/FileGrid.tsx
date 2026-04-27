@@ -45,7 +45,8 @@ export function FileGrid({ files, hiddenByPolicy, selectedId, onSelect }: Props)
   }
 
   function sortProps(key: SortKey): { sortDirection: 'ascending' | 'descending' } | Record<string, never> {
-    return sortKey === key ? { sortDirection: (sortDir + 'ending') as 'ascending' | 'descending' } : {};
+    if (sortKey !== key) return {};
+    return { sortDirection: sortDir === 'asc' ? 'ascending' : 'descending' };
   }
 
   return (
@@ -74,7 +75,7 @@ export function FileGrid({ files, hiddenByPolicy, selectedId, onSelect }: Props)
             onClick={() => onSelect(f)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(f); } }}
             tabIndex={0}
-            style={{ cursor: 'pointer' }}
+            className="cursor-pointer"
           >
             <TableCell>
               <span className="inline-flex items-center gap-2">
@@ -90,7 +91,7 @@ export function FileGrid({ files, hiddenByPolicy, selectedId, onSelect }: Props)
           </TableRow>
         ))}
         {hiddenByPolicy != null && hiddenByPolicy > 0 ? (
-          <TableRow aria-hidden="false" style={{ opacity: 0.55 }}>
+          <TableRow aria-hidden="false" className="opacity-50">
             <TableCell>
               <Badge color="informative" appearance="outline">
                 {hiddenByPolicy} file{hiddenByPolicy === 1 ? '' : 's'} hidden by only-own policy
