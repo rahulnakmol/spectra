@@ -10,3 +10,4 @@ export * from './useSearch';
 export * from './useAdminWorkspaces';
 export * from './useGroupMapping';
 export * from './useAudit';
+export * from './useUserSearch';
