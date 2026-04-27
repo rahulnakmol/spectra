@@ -1,1 +1,44 @@
-{ "name": "@spectra/web", "private": true, "version": "0.0.0" }
+{
+  "name": "@spectra/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:a11y": "playwright test --config=playwright.a11y.config.ts",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@spectra/shared": "*",
+    "@fluentui/react-components": "9.54.0",
+    "@fluentui/react-icons": "2.0.245",
+    "@tanstack/react-query": "5.40.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.23.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.9.1",
+    "@playwright/test": "1.44.0",
+    "@testing-library/jest-dom": "6.4.5",
+    "@testing-library/react": "15.0.7",
+    "@testing-library/user-event": "14.5.2",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.0",
+    "autoprefixer": "10.4.19",
+    "eslint-plugin-jsx-a11y": "6.8.0",
+    "eslint-plugin-react": "7.34.1",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "happy-dom": "14.10.1",
+    "postcss": "8.4.38",
+    "tailwindcss": "3.4.3",
+    "vite": "5.4.21",
+    "vitest": "1.5.0"
+  }
+}
